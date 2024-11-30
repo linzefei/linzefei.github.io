@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>3D Moving Text</title>
+	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+			perspective: 1000px;
+			background-color: #000;
+			color: #fff;
+			font-family: Arial, sans-serif;
+		}
+		.scene {
+			position: absolute;
+			width: 100vw;
+			height: 100vh;
+			transform-style: preserve-3d;
+		}
+		.text {
+			position: absolute;
+			font-size: 2em;
+			transform: translateZ(0);
+		}
+	</style>
+</head>
+<body>
+	<div class="scene" id="scene">
+		<div class="text" style="left: 50%; top: 50%;">Hello</div>
+		<div class="text" style="left: 20%; top: 20%;">World</div>
+		<div class="text" style="left: 80%; top: 80%;">3D</div>
+		<div class="text" style="left: 30%; top: 70%;">Text</div>
+	</div>
+	<script>
+		const texts = document.querySelectorAll('.text');
+		const scene = document.getElementById('scene');
+
+		function randomMovement() {
+			texts.forEach(text => {
+				const x = Math.random() * window.innerWidth;
+				const y = Math.random() * window.innerHeight;
+				const z = (Math.random() - 0.5) * 1000;
+				text.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+			});
+		}
+
+		setInterval(randomMovement, 2000);
+	</script>
+</body>
+</html>
