@@ -21,23 +21,25 @@
 		canvas.width = window.innerWidth;
 		canvas.height = window.innerHeight;
 
+		const centerX = canvas.width / 2;
+		const centerY = canvas.height / 2;
+
 		class Text3D {
-			constructor(text, x, y, z, size, color) {
+			constructor(text, radius, angle, z, size, color) {
 				this.text = text;
-				this.x = x;
-				this.y = y;
+				this.radius = radius; // 旋转半径
+				this.angle = angle;   // 初始角度
 				this.z = z;
 				this.size = size;
 				this.color = color;
-				this.vx = (Math.random() - 0.5) * 4;
-				this.vy = (Math.random() - 0.5) * 4;
+				this.speed = (Math.random() - 0.5) * 0.01; // 旋转速度
 			}
 
 			update() {
-				this.x += this.vx;
-				this.y += this.vy;
-				if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
-				if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+				this.angle += this.speed; // 更新角度
+				// 根据角度和半径计算x和y坐标
+				this.x = centerX + this.radius * Math.cos(this.angle);
+				this.y = centerY + this.radius * Math.sin(this.angle);
 			}
 
 			draw() {
@@ -51,42 +53,25 @@
 				ctx.fillText(this.text, 0, 0);
 				ctx.restore();
 			}
-
-			collidesWith(other) {
-				const halfSize = this.size / 2;
-				const otherHalfSize = other.size / 2;
-				const dx = this.x - other.x;
-				const dy = this.y - other.y;
-				const distance = Math.sqrt(dx * dx + dy * dy);
-				return distance < (halfSize + otherHalfSize);
-			}
 		}
 
 		const texts = [
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('World', 300, 200, 70, 30, 'green'),
-			new Text3D('World', 300, 200, 70, 30, 'green'),
-			new Text3D('World', 300, 200, 70, 30, 'green'),
-			new Text3D('World', 300, 200, 70, 30, 'green'),
-			new Text3D('World', 300, 200, 70, 30, 'green'),
-			new Text3D('!', 500, 300, 60, 20, 'yellow')
+			new Text3D('Hello', 200, 0, 50, 30, 'red'),
+			new Text3D('World', 150, Math.PI / 4, 70, 30, 'green'),
+			new Text3D('!', 100, Math.PI / 2, 60, 20, 'yellow')
 		];
 
 		function animate() {
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			texts.forEach((text, index) => {
 				text.update();
-				texts.forEach((other, otherIndex) => {
-					if (index !== otherIndex && text.collidesWith(other)) {
-						// 碰撞处理：改变颜色
-						text.color = 'blue';
-						other.color = 'blue';
-					}
-				});
+				// texts.forEach((other, otherIndex) => {
+				// 	if (index !== otherIndex && text.collidesWith(other)) {
+				// 		// 碰撞处理：改变颜色
+				// 		text.color = 'blue';
+				// 		other.color = 'blue';
+				// 	}
+				// });
 				text.draw();
 			});
 			requestAnimationFrame(animate);
