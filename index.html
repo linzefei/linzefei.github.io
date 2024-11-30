@@ -1,52 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>3D Moving Text</title>
-	<style>
-		body {
-			margin: 0;
-			overflow: hidden;
-			perspective: 1000px;
-			background-color: #000;
-			color: #fff;
-			font-family: Arial, sans-serif;
-		}
-		.scene {
-			position: absolute;
-			width: 100vw;
-			height: 100vh;
-			transform-style: preserve-3d;
-		}
-		.text {
-			position: absolute;
-			font-size: 2em;
-			transform: translateZ(0);
-		}
-	</style>
+<meta charset="UTF-8">
+<title>3D Text Animation</title>
+<style>
+  canvas {
+    display: block;
+    margin: 0 auto;
+    background-color: #000;
+  }
+</style>
 </head>
 <body>
-	<div class="scene" id="scene">
-		<div class="text" style="left: 50%; top: 50%;">Hello</div>
-		<div class="text" style="left: 20%; top: 20%;">World</div>
-		<div class="text" style="left: 80%; top: 80%;">3D</div>
-		<div class="text" style="left: 30%; top: 70%;">Text</div>
-	</div>
-	<script>
-		const texts = document.querySelectorAll('.text');
-		const scene = document.getElementById('scene');
+<canvas id="scene"></canvas>
+<script>
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-		function randomMovement() {
-			texts.forEach(text => {
-				const x = Math.random() * window.innerWidth;
-				const y = Math.random() * window.innerHeight;
-				const z = (Math.random() - 0.5) * 1000;
-				text.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
-			});
-		}
+class Text3D {
+  constructor(text, x, y, z, size, color) {
+    this.text = text;
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.size = size;
+    this.color = color;
+    this.vx = Math.random() * 4 - 2;
+    this.vy = Math.random() * 4 - 2;
+  }
 
-		setInterval(randomMovement, 2000);
-	</script>
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+    if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+  }
+
+  draw() {
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(this.z / 100, this.z / 100);
+    ctx.fillStyle = this.color;
+    ctx.font = `${this.size * (100 / this.z)}px Arial`;
+    ctx.fillText(this.text, -ctx.measureText(this.text).width / 2, this.size / 2);
+    ctx.restore();
+  }
+}
+
+const texts = [
+  new Text3D('Hello', 100, 100, 50, 30, 'red'),
+  new Text3D('World', 300, 200, 70, 30, 'green')
+];
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  texts.forEach(text => {
+    text.update();
+    text.draw();
+  });
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
 </body>
 </html>
