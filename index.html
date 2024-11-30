@@ -3,7 +3,7 @@
 
 <head>
 	<meta charset="UTF-8">
-	<title>3D Text Animation</title>
+	<title>3D Text Animation with Collision Detection</title>
 	<style>
 		canvas {
 			display: block;
@@ -29,8 +29,8 @@
 				this.z = z;
 				this.size = size;
 				this.color = color;
-				this.vx = Math.random() * 4 - 2;
-				this.vy = Math.random() * 4 - 2;
+				this.vx = (Math.random() - 0.5) * 4;
+				this.vy = (Math.random() - 0.5) * 4;
 			}
 
 			update() {
@@ -46,35 +46,21 @@
 				ctx.scale(this.z / 100, this.z / 100);
 				ctx.fillStyle = this.color;
 				ctx.font = `${this.size * (100 / this.z)}px Arial`;
-				ctx.fillText(this.text, -ctx.measureText(this.text).width / 2, this.size / 2);
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.fillText(this.text, 0, 0);
 				ctx.restore();
 			}
 
-
-			// 检查两个Text3D对象是否碰撞
 			collidesWith(other) {
-				// 计算两个文本的边界盒
-				const thisBox = {
-					x: this.x - this.size / 2,
-					y: this.y - this.size / 2,
-					width: this.size,
-					height: this.size
-				};
-				const otherBox = {
-					x: other.x - other.size / 2,
-					y: other.y - other.size / 2,
-					width: other.size,
-					height: other.size
-				};
-
-				// 检查边界盒是否相交
-				return !(thisBox.x + thisBox.width < otherBox.x ||
-					thisBox.x > otherBox.x + otherBox.width ||
-					thisBox.y + thisBox.height < otherBox.y ||
-					thisBox.y > otherBox.y + otherBox.height);
+				const halfSize = this.size / 2;
+				const otherHalfSize = other.size / 2;
+				const dx = this.x - other.x;
+				const dy = this.y - other.y;
+				const distance = Math.sqrt(dx * dx + dy * dy);
+				return distance < (halfSize + otherHalfSize);
 			}
 		}
-
 
 		const texts = [
 			new Text3D('Hello', 100, 100, 50, 30, 'red'),
@@ -82,25 +68,25 @@
 			new Text3D('Hello', 100, 100, 50, 30, 'red'),
 			new Text3D('Hello', 100, 100, 50, 30, 'red'),
 			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('Hello', 100, 100, 50, 30, 'red'),
-			new Text3D('World', 300, 200, 70, 30, 'green')
+			new Text3D('World', 300, 200, 70, 30, 'green'),
+			new Text3D('World', 300, 200, 70, 30, 'green'),
+			new Text3D('World', 300, 200, 70, 30, 'green'),
+			new Text3D('World', 300, 200, 70, 30, 'green'),
+			new Text3D('World', 300, 200, 70, 30, 'green'),
+			new Text3D('!', 500, 300, 60, 20, 'yellow')
 		];
 
-		// 在动画循环中检查碰撞
 		function animate() {
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 			texts.forEach((text, index) => {
 				text.update();
-				// 检查与其他文本的碰撞
-				for (let i = index + 1; i < texts.length; i++) {
-					if (text.collidesWith(texts[i])) {
-						// 处理碰撞，例如改变颜色、方向或速度
+				texts.forEach((other, otherIndex) => {
+					if (index !== otherIndex && text.collidesWith(other)) {
+						// 碰撞处理：改变颜色
 						text.color = 'blue';
-						texts[i].color = 'blue';
+						other.color = 'blue';
 					}
-				}
+				});
 				text.draw();
 			});
 			requestAnimationFrame(animate);
