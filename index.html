@@ -11,74 +11,12 @@
 			background-color: #000;
 		}
 	</style>
+    <script src="https://threejs.org/build/three.js"></script>
+	<script src="./js/main.js"></script>
 </head>
 
 <body>
 	<canvas id="scene"></canvas>
-	<script>
-		const canvas = document.getElementById('scene');
-		const ctx = canvas.getContext('2d');
-		canvas.width = window.innerWidth;
-		canvas.height = window.innerHeight;
-
-		const centerX = canvas.width / 2;
-		const centerY = canvas.height / 2;
-
-		class Text3D {
-			constructor(text, radius, angle, z, size, color) {
-				this.text = text;
-				this.radius = radius; // 旋转半径
-				this.angle = angle;   // 初始角度
-				this.z = z;
-				this.size = size;
-				this.color = color;
-				this.speed = (Math.random() - 0.5) * 0.01; // 旋转速度
-			}
-
-			update() {
-				this.angle += this.speed; // 更新角度
-				// 根据角度和半径计算x和y坐标
-				this.x = centerX + this.radius * Math.cos(this.angle);
-				this.y = centerY + this.radius * Math.sin(this.angle);
-			}
-
-			draw() {
-				ctx.save();
-				ctx.translate(this.x, this.y);
-				ctx.scale(this.z / 100, this.z / 100);
-				ctx.fillStyle = this.color;
-				ctx.font = `${this.size * (100 / this.z)}px Arial`;
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-				ctx.fillText(this.text, 0, 0);
-				ctx.restore();
-			}
-		}
-
-		const texts = [
-			new Text3D('Hello', 200, 0, 50, 30, 'red'),
-			new Text3D('World', 150, Math.PI / 4, 70, 30, 'green'),
-			new Text3D('!', 100, Math.PI / 2, 60, 20, 'yellow')
-		];
-
-		function animate() {
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
-			texts.forEach((text, index) => {
-				text.update();
-				// texts.forEach((other, otherIndex) => {
-				// 	if (index !== otherIndex && text.collidesWith(other)) {
-				// 		// 碰撞处理：改变颜色
-				// 		text.color = 'blue';
-				// 		other.color = 'blue';
-				// 	}
-				// });
-				text.draw();
-			});
-			requestAnimationFrame(animate);
-		}
-
-		animate();
-	</script>
 </body>
 
 </html>
