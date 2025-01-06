@@ -20,8 +20,14 @@ const CONFIG = {
 		0x00ffff  // 青
 	],
 	textSize: 30,
-	textHeight: 2,
+	textHeight: 5,
 	orbitRadius: 300,
-	verticalSpacing: 80,
-	rotationSpeed: 0.5
+	verticalSpacing: 50,
+	rotationSpeed: 0.5,
+	bounds: {
+		min: -500,
+		max: 500
+	},
+	maxSpeed: 2,
+	maxRotationSpeed: 0.02
 };
