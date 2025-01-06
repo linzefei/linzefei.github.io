@@ -6,8 +6,7 @@ if (typeof THREE === 'undefined') {
 
 let scene, camera, renderer;
 let texts = [];
-let controls;
-let isInitialized = false; // 添加初始化标志
+let controls; // 添加相机控制
 
 function init() {
     try {
@@ -33,26 +32,13 @@ function init() {
         pointLight.position.set(100, 100, 100);
         scene.add(pointLight);
 
-        // 添加相机控制
-        controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.screenSpacePanning = false;
-        controls.minDistance = 100;
-        controls.maxDistance = 1500;
-        controls.maxPolarAngle = Math.PI;
-
-        // 添加窗口大小变化事件监听器
-        window.addEventListener('resize', onWindowResize, false);
-
         // 加载字体并创建文字
         const loader = new THREE.FontLoader();
+        
         loader.load(
             'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
             function(font) {
                 createTexts(font);
-                isInitialized = true; // 标记初始化完成
-                animate(); // 在这里开始动画循环
             },
             function(xhr) {
                 console.log((xhr.loaded / xhr.total * 100) + '% loaded');
@@ -61,6 +47,18 @@ function init() {
                 console.error('Font loading error:', err);
             }
         );
+
+        // 添加窗口大小变化事件监听器
+        window.addEventListener('resize', onWindowResize, false);
+
+        // 添加相机控制
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; // 添加阻尼效果
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 100;
+        controls.maxDistance = 1500;
+        controls.maxPolarAngle = Math.PI;
     } catch (error) {
         console.error('Error in init:', error);
     }
@@ -98,19 +96,16 @@ function onWindowResize() {
 }
 
 function animate() {
-    if (!isInitialized) return; // 如果未初始化完成，不执行动画
-
     requestAnimationFrame(animate);
     if (texts.length > 0) {
         texts.forEach(text => text.update());
     }
-    if (controls) {
-        controls.update();
-    }
+    controls.update(); // 更新控制器
     renderer.render(scene, camera);
 }
 
-// 只初始化场景，animate 会在字体加载完成后开始
+// 确保所有资源加载完成后再初始化
 window.addEventListener('load', function() {
     init();
+    animate();
 });
