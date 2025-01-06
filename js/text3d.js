@@ -1,31 +1,52 @@
-
 class Text3D {
-	constructor(text, radius, angle, z, size, color) {
+	constructor(text, params) {
 		this.text = text;
-		this.radius = radius; // 旋转半径
-		this.angle = angle;   // 初始角度
-		this.z = z;
-		this.size = size;
-		this.color = color;
-		this.speed = (Math.random() - 0.5) * 0.01; // 旋转速度
+		this.mesh = null;
+		this.params = params;
+		this.angle = Math.random() * Math.PI * 2;
+		this.verticalOffset = params.verticalOffset || 0;
+		this.rotationSpeed = (Math.random() * 0.5 + 0.5) * params.rotationSpeed;
+	}
+
+	create(scene, font) {
+		const geometry = new THREE.TextGeometry(this.text, {
+			font: font,
+			size: this.params.size,
+			height: this.params.height,
+			curveSegments: 12,
+			bevelEnabled: true,
+			bevelThickness: 1,
+			bevelSize: 0.5,
+			bevelSegments: 3
+		});
+
+		const material = new THREE.MeshPhongMaterial({
+			color: this.params.colors[Math.floor(Math.random() * this.params.colors.length)],
+			specular: 0xffffff,
+			shininess: 100
+		});
+
+		this.mesh = new THREE.Mesh(geometry, material);
+		geometry.computeBoundingBox();
+		geometry.center();
+		
+		scene.add(this.mesh);
 	}
 
 	update() {
-		this.angle += this.speed; // 更新角度
-		// 根据角度和半径计算x和y坐标
-		this.x = centerX + this.radius * Math.cos(this.angle);
-		this.y = centerY + this.radius * Math.sin(this.angle);
-	}
+		if (!this.mesh) return;
 
-	draw() {
-		ctx.save();
-		ctx.translate(this.x, this.y);
-		ctx.scale(this.z / 100, this.z / 100);
-		ctx.fillStyle = this.color;
-		ctx.font = `${this.size * (100 / this.z)}px Arial`;
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		ctx.fillText(this.text, 0, 0);
-		ctx.restore();
+		this.angle += this.rotationSpeed * 0.01;
+		
+		// 计算位置
+		this.mesh.position.x = Math.cos(this.angle) * this.params.radius;
+		this.mesh.position.z = Math.sin(this.angle) * this.params.radius;
+		this.mesh.position.y = this.verticalOffset;
+
+		// 始终朝向中心
+		this.mesh.lookAt(0, this.mesh.position.y, 0);
+		
+		// 添加一点倾斜
+		this.mesh.rotation.z = Math.PI * 0.1;
 	}
 }
