@@ -7,6 +7,11 @@ if (typeof THREE === 'undefined') {
 let scene, camera, renderer;
 let texts = [];
 let controls; // 添加相机控制
+let isOrbitMode = true; // 默认为场景旋转模式
+let isDragging = false;
+let selectedText = null;
+let mouse = new THREE.Vector2();
+let raycaster = new THREE.Raycaster();
 
 function init() {
     try {
@@ -59,6 +64,75 @@ function init() {
         controls.minDistance = 100;
         controls.maxDistance = 1500;
         controls.maxPolarAngle = Math.PI;
+
+        // 添加模式切换按钮的事件监听
+        const modeSwitch = document.getElementById('mode-switch');
+        const modeLabel = document.getElementById('mode-label');
+
+        modeSwitch.addEventListener('click', () => {
+            isOrbitMode = !isOrbitMode;
+            controls.enabled = isOrbitMode;
+            modeLabel.textContent = `当前模式：${isOrbitMode ? '场景旋转' : '文字引力'}`;
+        });
+
+        // 添加鼠标/触摸事件监听器
+        renderer.domElement.addEventListener('pointerdown', onPointerDown);
+        renderer.domElement.addEventListener('pointermove', onPointerMove);
+        renderer.domElement.addEventListener('pointerup', onPointerUp);
+        
+        // 更新鼠标位置的函数
+        function updateMousePosition(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        // 获取3D空间中的点
+        function getIntersectionPoint(event) {
+            updateMousePosition(event);
+            
+            // 创建一个平面，用于获取鼠标在3D空间中的位置
+            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            const point = new THREE.Vector3();
+            
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(plane, point);
+            
+            return point;
+        }
+
+        function onPointerDown(event) {
+            if (!isOrbitMode) {
+                updateMousePosition(event);
+                raycaster.setFromCamera(mouse, camera);
+                
+                const intersects = raycaster.intersectObjects(texts.map(t => t.mesh));
+                
+                if (intersects.length > 0) {
+                    isDragging = true;
+                    selectedText = texts.find(t => t.mesh === intersects[0].object);
+                    controls.enabled = false;
+                    
+                    const point = getIntersectionPoint(event);
+                    selectedText.setAttractionTarget(point);
+                }
+            }
+        }
+
+        function onPointerMove(event) {
+            if (!isOrbitMode && isDragging && selectedText) {
+                const point = getIntersectionPoint(event);
+                selectedText.setAttractionTarget(point);
+            }
+        }
+
+        function onPointerUp(event) {
+            if (!isOrbitMode && selectedText) {
+                selectedText.releaseAttraction();
+                selectedText = null;
+                isDragging = false;
+                controls.enabled = isOrbitMode;
+            }
+        }
     } catch (error) {
         console.error('Error in init:', error);
     }

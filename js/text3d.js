@@ -23,6 +23,17 @@ class Text3D {
 			y: (Math.random() - 0.5) * 0.01,
 			z: (Math.random() - 0.5) * 0.01
 		};
+		
+		// 添加原始轨道位置记录
+		this.originalOrbit = { ...this.orbit };
+		
+		// 添加吸引力相关属性
+		this.attraction = {
+			active: false,
+			target: new THREE.Vector3(),
+			strength: 0.1,
+			returnSpeed: 0.05
+		};
 	}
 
 	create(scene, font) {
@@ -53,26 +64,44 @@ class Text3D {
 	update() {
 		if (!this.mesh) return;
 
-		// 更新轨道位置
-		this.orbit.angle += this.orbit.speed * 0.01;
-		
-		// 计算基础轨道位置
-		const position = new THREE.Vector3(
-			Math.cos(this.orbit.angle) * this.orbit.radius,
-			0,
-			Math.sin(this.orbit.angle) * this.orbit.radius
-		);
+		if (this.attraction.active) {
+			// 计算朝向鼠标/触摸点的吸引力
+			const direction = new THREE.Vector3().subVectors(this.attraction.target, this.mesh.position);
+			const distance = direction.length();
+			
+			if (distance > 1) {
+				direction.normalize();
+				this.mesh.position.add(direction.multiplyScalar(this.attraction.strength * distance));
+			}
+		} else {
+			// 正常轨道运动
+			this.orbit.angle += this.orbit.speed * 0.01;
+			
+			const position = new THREE.Vector3(
+				Math.cos(this.orbit.angle) * this.orbit.radius,
+				0,
+				Math.sin(this.orbit.angle) * this.orbit.radius
+			);
 
-		// 应用轨道倾斜
-		position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
-		
-		// 相对于轨道中心点设置位置
-		this.mesh.position.copy(this.orbit.center).add(position);
+			position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
+			
+			// 平滑回归原始轨道
+			const targetPosition = new THREE.Vector3().copy(this.orbit.center).add(position);
+			this.mesh.position.lerp(targetPosition, this.attraction.returnSpeed);
+		}
 
 		// 使文字朝向轨道中心
 		this.mesh.lookAt(this.orbit.center);
-		
-		// 保持文字稍微向上倾斜
 		this.mesh.rotateX(Math.PI * 0.1);
+	}
+
+	// 添加新方法
+	setAttractionTarget(point) {
+		this.attraction.target.copy(point);
+		this.attraction.active = true;
+	}
+
+	releaseAttraction() {
+		this.attraction.active = false;
 	}
 }
