@@ -21,13 +21,17 @@ const CONFIG = {
 	],
 	textSize: 30,
 	textHeight: 5,
-	orbitRadius: 300,
-	verticalSpacing: 50,
-	rotationSpeed: 0.5,
-	bounds: {
-		min: -500,
-		max: 500
+	orbits: {
+		baseRadius: 100,
+		radiusIncrement: 50,
+		rotationSpeed: {
+			min: 0.2,
+			max: 1.0
+		},
+		tilt: 0.1
 	},
-	maxSpeed: 2,
-	maxRotationSpeed: 0.02
+	bounds: {
+		min: -1000,
+		max: 1000
+	}
 };

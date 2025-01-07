@@ -66,24 +66,31 @@ function init() {
 
 function createTexts(font) {
     try {
-        const textCount = CONFIG.texts.length;
-        const verticalSpacing = CONFIG.verticalSpacing;
+        let previousText = null;
         
         CONFIG.texts.forEach((text, index) => {
-            const verticalOffset = (index - textCount/2) * verticalSpacing;
+            const radius = CONFIG.orbits.baseRadius + 
+                         (index * CONFIG.orbits.radiusIncrement);
             
             const text3D = new Text3D(text, {
                 size: CONFIG.textSize,
                 height: CONFIG.textHeight,
-                radius: CONFIG.orbitRadius,
+                radius: radius,
                 colors: CONFIG.colors,
-                rotationSpeed: CONFIG.rotationSpeed,
-                verticalOffset: verticalOffset
+                level: index,
+                // 如果是第一个文本，中心点是原点；否则是前一个文本的位置
+                center: previousText ? previousText.mesh.position : new THREE.Vector3(0, 0, 0)
             });
 
             text3D.create(scene, font);
             texts.push(text3D);
+            previousText = text3D;
         });
+
+        // 调整相机位置以便更好地观察整个场景
+        camera.position.set(0, 500, 1000);
+        camera.lookAt(0, 0, 0);
+        
     } catch (error) {
         console.error('Error creating texts:', error);
     }
