@@ -142,7 +142,7 @@ function createTexts(font) {
     try {
         let previousText = null;
         
-        CONFIG.texts.forEach((text, index) => {
+        TextConfig.items.forEach((text, index) => {
             const radius = CONFIG.orbits.baseRadius + 
                          (index * CONFIG.orbits.radiusIncrement);
             
@@ -150,9 +150,8 @@ function createTexts(font) {
                 size: CONFIG.textSize,
                 height: CONFIG.textHeight,
                 radius: radius,
-                colors: CONFIG.colors,
+                colors: TextConfig.colors,
                 level: index,
-                // 如果是第一个文本，中心点是原点；否则是前一个文本的位置
                 center: previousText ? previousText.mesh.position : new THREE.Vector3(0, 0, 0)
             });
 
@@ -161,7 +160,6 @@ function createTexts(font) {
             previousText = text3D;
         });
 
-        // 调整相机位置以便更好地观察整个场景
         camera.position.set(0, 500, 1000);
         camera.lookAt(0, 0, 0);
         
