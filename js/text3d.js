@@ -49,7 +49,7 @@ class Text3D {
 		});
 
 		const material = new THREE.MeshPhongMaterial({
-			color: this.params.colors[Math.floor(Math.random() * this.params.colors.length)],
+			color: this.params.color,
 			specular: 0xffffff,
 			shininess: 100
 		});

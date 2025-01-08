@@ -1,27 +1,3 @@
-// 文字内容配置
-const TextConfig = {
-	items: [
-		'Hello World!',
-		'Three.js',
-		'JavaScript',
-		'Python',
-		'Java',
-		'C++',
-		'React',
-		'Vue',
-		'Angular',
-		'Node.js'
-	],
-	colors: [
-		0xff0000, // 红
-		0x00ff00, // 绿
-		0x0000ff, // 蓝
-		0xffff00, // 黄
-		0xff00ff, // 紫
-		0x00ffff  // 青
-	]
-};
-
 // 场景配置
 const CONFIG = {
 	// 文字样式
@@ -45,43 +21,3 @@ const CONFIG = {
 		max: 1000
 	}
 };
-
-// 添加文字的方法
-function addText(text, color) {
-	if (!TextConfig.items.includes(text)) {
-		TextConfig.items.push(text);
-	}
-	if (color && !TextConfig.colors.includes(color)) {
-		TextConfig.colors.push(color);
-	}
-}
-
-// 移除文字的方法
-function removeText(text) {
-	const index = TextConfig.items.indexOf(text);
-	if (index > -1) {
-		TextConfig.items.splice(index, 1);
-	}
-}
-
-// 清空所有文字
-function clearTexts() {
-	TextConfig.items = [];
-}
-
-// 添加颜色
-function addColor(color) {
-	if (!TextConfig.colors.includes(color)) {
-		TextConfig.colors.push(color);
-	}
-}
-
-// 获取所有文字
-function getTexts() {
-	return TextConfig.items;
-}
-
-// 获取所有颜色
-function getColors() {
-	return TextConfig.colors;
-}

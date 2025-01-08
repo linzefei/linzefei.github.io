@@ -141,16 +141,17 @@ function init() {
 function createTexts(font) {
     try {
         let previousText = null;
+        const items = TextData.getNextPage();
         
-        TextConfig.items.forEach((text, index) => {
+        items.forEach((item, index) => {
             const radius = CONFIG.orbits.baseRadius + 
                          (index * CONFIG.orbits.radiusIncrement);
             
-            const text3D = new Text3D(text, {
+            const text3D = new Text3D(item.text, {
                 size: CONFIG.textSize,
                 height: CONFIG.textHeight,
                 radius: radius,
-                colors: TextConfig.colors,
+                color: item.color,
                 level: index,
                 center: previousText ? previousText.mesh.position : new THREE.Vector3(0, 0, 0)
             });
@@ -160,9 +161,12 @@ function createTexts(font) {
             previousText = text3D;
         });
 
-        camera.position.set(0, 500, 1000);
-        camera.lookAt(0, 0, 0);
-        
+        // 如果还有更多文字，设置定时器加载下一批
+        if (TextData.getCount() > (TextData.currentPage * TextData.pageSize)) {
+            setTimeout(() => {
+                createTexts(font);
+            }, 2000);
+        }
     } catch (error) {
         console.error('Error creating texts:', error);
     }
