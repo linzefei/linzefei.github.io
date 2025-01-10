@@ -121,14 +121,53 @@ class Text3D {
 				const targetPosition = new THREE.Vector3().copy(this.orbit.center).add(position);
 				
 				// 更新文字位置
-				this.mesh.position.lerp(targetPosition, 0.1); // 降低移动速度使运动更平滑
+				this.mesh.position.lerp(targetPosition, 0.1);
 
-				// 更新轨道线
+				// 更新轨道线颜色
 				if (this.orbitLine.line) {
-					// 轨道线跟随文字位置
-					this.orbitLine.line.position.copy(this.orbit.center);
-					this.orbitLine.line.rotation.x = this.orbit.tilt;
-					this.orbitLine.line.rotation.y = this.orbit.angle;
+					const colors = this.orbitLine.colors;
+					const segments = this.orbitLine.segments;
+					
+					// 获取文字当前位置相对于轨道中心的方向
+					const direction = this.mesh.position.clone().sub(this.orbit.center);
+					const currentAngle = Math.atan2(direction.z, direction.x);
+					
+					// 更新每个点的颜色
+					for (let i = 0; i <= segments; i++) {
+						const angle = (i / segments) * Math.PI * 2;
+						
+						// 计算与当前位置的角度差
+						let deltaAngle = angle - currentAngle;
+						while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
+						while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
+						
+						// 设置颜色和透明度
+						const colorIndex = i * 3;
+						const color = new THREE.Color(this.params.color);
+						
+						// 计算透明度
+						let opacity = 0;
+						const pastArc = Math.PI * 0.2;   // 过去轨迹长度
+						const futureArc = Math.PI * 0.3;  // 未来轨迹长度
+						
+						if (deltaAngle < 0 && deltaAngle > -pastArc) {
+							// 过去的轨迹，渐变消失
+							opacity = 0.8 * (1 + deltaAngle / pastArc);
+						} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
+							// 未来的轨迹，使用虚线效果
+							opacity = 0.4 * (1 - deltaAngle / futureArc);
+							// 添加虚线效果
+							if ((i % 4) < 2) { // 每4个点中的2个点可见
+								opacity *= 0.5;
+							}
+						}
+						
+						colors[colorIndex] = color.r * opacity;
+						colors[colorIndex + 1] = color.g * opacity;
+						colors[colorIndex + 2] = color.b * opacity;
+					}
+					
+					this.orbitLine.line.geometry.attributes.color.needsUpdate = true;
 					this.orbitLine.line.visible = true;
 				}
 			}
@@ -248,67 +287,46 @@ class Text3D {
 		return nextPos.sub(currentPos);
 	}
 
-	// 修改创建轨道线的方法
+	// 修改 createOrbitLine 方法
 	createOrbitLine(scene) {
-		const points = {
-			past: [],
-			future: []
+		// 创建完整轨道
+		const points = [];
+		const segments = 64; // 增加分段数使轨道更平滑
+		
+		// 生成完整轨道的点
+		for (let i = 0; i <= segments; i++) {
+			const angle = (i / segments) * Math.PI * 2;
+			const x = Math.cos(angle) * this.orbit.radius;
+			const z = Math.sin(angle) * this.orbit.radius;
+			const point = new THREE.Vector3(x, 0, z);
+			points.push(point);
+		}
+
+		// 创建轨道几何体
+		const geometry = new THREE.BufferGeometry().setFromPoints(points);
+		
+		// 创建顶点颜色数组
+		const colors = new Float32Array(points.length * 3);
+		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+		
+		// 创建使用顶点颜色的材质
+		const material = new THREE.LineBasicMaterial({
+			vertexColors: true,
+			transparent: true,
+			depthWrite: false
+		});
+
+		const line = new THREE.Line(geometry, material);
+		line.position.copy(this.orbit.center);
+		line.rotation.x = this.orbit.tilt;
+		
+		this.orbitLine = {
+			line: line,
+			segments: segments,
+			colors: colors
 		};
 		
-		const segments = this.orbitLine.segments;
-		const arcLength = Math.PI * 0.2; // 缩短弧长
-		
-		// 生成过去轨迹的点（实线部分）
-		for (let i = 0; i <= segments; i++) {
-			const t = i / segments;
-			const angle = -arcLength + arcLength * t * 0.8; // 缩短过去轨迹
-			const x = Math.cos(angle) * this.orbit.radius;
-			const z = Math.sin(angle) * this.orbit.radius;
-			const point = new THREE.Vector3(x, 0, z);
-			points.past.push(point);
-		}
-		
-		// 生成未来轨迹的点（虚线部分）
-		for (let i = 0; i <= segments; i++) {
-			const t = i / segments;
-			const angle = 0 + arcLength * t * 1.2; // 延长未来轨迹
-			const x = Math.cos(angle) * this.orbit.radius;
-			const z = Math.sin(angle) * this.orbit.radius;
-			const point = new THREE.Vector3(x, 0, z);
-			points.future.push(point);
-		}
-
-		// 创建过去轨迹（实线）
-		const pastGeometry = new THREE.BufferGeometry().setFromPoints(points.past);
-		const pastMaterial = new THREE.LineBasicMaterial({
-			color: this.params.color,
-			opacity: 0.6,  // 增加不透明度
-			transparent: true,
-			depthWrite: false
-		});
-		
-		// 创建未来轨迹（虚线）
-		const futureGeometry = new THREE.BufferGeometry().setFromPoints(points.future);
-		const futureMaterial = new THREE.LineDashedMaterial({
-			color: this.params.color,
-			dashSize: 3,
-			gapSize: 2,
-			opacity: 0.3,  // 降低不透明度
-			transparent: true,
-			depthWrite: false
-		});
-
-		const group = new THREE.Group();
-		
-		const pastLine = new THREE.Line(pastGeometry, pastMaterial);
-		const futureLine = new THREE.Line(futureGeometry, futureMaterial);
-		futureLine.computeLineDistances();
-		
-		group.add(pastLine);
-		group.add(futureLine);
-		
-		this.orbitLine.line = group;
-		scene.add(this.orbitLine.line);
+		scene.add(line);
 	}
 
 	// 根据角度计算透明度
