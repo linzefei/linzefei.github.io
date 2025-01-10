@@ -47,6 +47,14 @@ class Text3D {
 			strength: 0.1,
 			tension: 0.3
 		};
+		
+		// 添加轨道线相关属性
+		this.orbitLine = {
+			line: null,
+			segments: 32,     // 轨道线段数
+			visibleArc: 0.2,  // 可见弧长比例 (0-1)
+			material: null
+		};
 	}
 
 	create(scene, font) {
@@ -93,28 +101,45 @@ class Text3D {
 					this.mesh.position.add(direction.multiplyScalar(this.gravityLine.strength * distance));
 					this.mesh.position.add(orbitForce.multiplyScalar(0.3)); // 保持部分轨道运动
 				}
+				
+				// 如果处于吸引状态，隐藏轨道线
+				if (this.orbitLine.line) {
+					this.orbitLine.line.visible = false;
+				}
 			} else {
 				// 正常轨道运动
 				this.orbit.angle += this.orbit.speed * 0.01;
 				
+				// 计算目标位置
 				const position = new THREE.Vector3(
-						Math.cos(this.orbit.angle) * this.orbit.radius,
-						0,
-						Math.sin(this.orbit.angle) * this.orbit.radius
+					Math.cos(this.orbit.angle) * this.orbit.radius,
+					0,
+					Math.sin(this.orbit.angle) * this.orbit.radius
 				);
-
 				position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
 				
 				const targetPosition = new THREE.Vector3().copy(this.orbit.center).add(position);
-				this.mesh.position.lerp(targetPosition, this.attraction.returnSpeed);
+				
+				// 更新文字位置
+				this.mesh.position.lerp(targetPosition, 0.1); // 降低移动速度使运动更平滑
+
+				// 更新轨道线
+				if (this.orbitLine.line) {
+					// 轨道线跟随文字位置
+					this.orbitLine.line.position.copy(this.orbit.center);
+					this.orbitLine.line.rotation.x = this.orbit.tilt;
+					this.orbitLine.line.rotation.y = this.orbit.angle;
+					this.orbitLine.line.visible = true;
+				}
 			}
 
 			// 使文字朝向轨道中心
 			this.mesh.lookAt(this.orbit.center);
 			this.mesh.rotateX(Math.PI * 0.1);
+			
 		} catch (error) {
 			console.error('Error in update:', error);
-			this.releaseGravityLine(); // 出错时释放引力线
+			this.releaseGravityLine();
 		}
 	}
 
@@ -221,5 +246,101 @@ class Text3D {
 		nextPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
 		
 		return nextPos.sub(currentPos);
+	}
+
+	// 修改创建轨道线的方法
+	createOrbitLine(scene) {
+		const points = {
+			past: [],
+			future: []
+		};
+		
+		const segments = this.orbitLine.segments;
+		const arcLength = Math.PI * 0.2; // 缩短弧长
+		
+		// 生成过去轨迹的点（实线部分）
+		for (let i = 0; i <= segments; i++) {
+			const t = i / segments;
+			const angle = -arcLength + arcLength * t * 0.8; // 缩短过去轨迹
+			const x = Math.cos(angle) * this.orbit.radius;
+			const z = Math.sin(angle) * this.orbit.radius;
+			const point = new THREE.Vector3(x, 0, z);
+			points.past.push(point);
+		}
+		
+		// 生成未来轨迹的点（虚线部分）
+		for (let i = 0; i <= segments; i++) {
+			const t = i / segments;
+			const angle = 0 + arcLength * t * 1.2; // 延长未来轨迹
+			const x = Math.cos(angle) * this.orbit.radius;
+			const z = Math.sin(angle) * this.orbit.radius;
+			const point = new THREE.Vector3(x, 0, z);
+			points.future.push(point);
+		}
+
+		// 创建过去轨迹（实线）
+		const pastGeometry = new THREE.BufferGeometry().setFromPoints(points.past);
+		const pastMaterial = new THREE.LineBasicMaterial({
+			color: this.params.color,
+			opacity: 0.6,  // 增加不透明度
+			transparent: true,
+			depthWrite: false
+		});
+		
+		// 创建未来轨迹（虚线）
+		const futureGeometry = new THREE.BufferGeometry().setFromPoints(points.future);
+		const futureMaterial = new THREE.LineDashedMaterial({
+			color: this.params.color,
+			dashSize: 3,
+			gapSize: 2,
+			opacity: 0.3,  // 降低不透明度
+			transparent: true,
+			depthWrite: false
+		});
+
+		const group = new THREE.Group();
+		
+		const pastLine = new THREE.Line(pastGeometry, pastMaterial);
+		const futureLine = new THREE.Line(futureGeometry, futureMaterial);
+		futureLine.computeLineDistances();
+		
+		group.add(pastLine);
+		group.add(futureLine);
+		
+		this.orbitLine.line = group;
+		scene.add(this.orbitLine.line);
+	}
+
+	// 根据角度计算透明度
+	getOpacityForAngle(angle, start, end) {
+		// 标准化角度到 [0, 2π]
+		while (angle < 0) angle += Math.PI * 2;
+		while (start < 0) start += Math.PI * 2;
+		while (end < 0) end += Math.PI * 2;
+		
+		if (end < start) end += Math.PI * 2;
+		if (angle < start) angle += Math.PI * 2;
+		
+		// 如果角度在可见区间内
+		if (angle >= start && angle <= end) {
+			// 计算渐变透明度
+			const progress = (angle - start) / (end - start);
+			return 1 - progress; // 越往后越透明
+		}
+		
+		return 0; // 不可见区域完全透明
+	}
+
+	// 添加清理轨道线的方法
+	releaseOrbitLine(scene) {
+		if (this.orbitLine.line) {
+			// 清理组中的所有线条
+			this.orbitLine.line.children.forEach(line => {
+				line.geometry.dispose();
+				line.material.dispose();
+			});
+			scene.remove(this.orbitLine.line);
+			this.orbitLine.line = null;
+		}
 	}
 }

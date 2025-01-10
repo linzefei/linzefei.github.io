@@ -171,6 +171,7 @@ function createTexts(font) {
             });
 
             text3D.create(scene, font);
+            text3D.createOrbitLine(scene);
             texts.push(text3D);
             previousText = text3D;
         });
@@ -212,6 +213,9 @@ function cleanup() {
     texts.forEach(text => {
         if (text && text.gravityLine && text.gravityLine.active) {
             text.releaseGravityLine();
+        }
+        if (text && text.orbitLine && text.orbitLine.line) {
+            text.releaseOrbitLine(scene);
         }
     });
 }
