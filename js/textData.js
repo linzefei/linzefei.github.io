@@ -142,5 +142,8 @@ TextData.addTexts([
     'React',
     'Vue',
     'Angular',
-    'Node.js'
+    'Node.js',
+    "2025",
+    "linzefei",
+    "Cursor"
 ]); 
