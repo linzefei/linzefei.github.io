@@ -106,29 +106,43 @@ function init() {
                 raycaster.setFromCamera(mouse, camera);
                 
                 const intersects = raycaster.intersectObjects(texts.map(t => t.mesh));
+                const point = getIntersectionPoint(event);
                 
-                if (intersects.length > 0) {
-                    isDragging = true;
-                    selectedText = texts.find(t => t.mesh === intersects[0].object);
-                    controls.enabled = false;
-                    
-                    const point = getIntersectionPoint(event);
-                    selectedText.setAttractionTarget(point);
-                }
+                // 查找附近的文字
+                texts.forEach(text => {
+                    const distance = text.mesh.position.distanceTo(point);
+                    if (distance < 200) { // 设置吸引范围
+                        isDragging = true;
+                        text.createGravityLine(scene, point);
+                        text.setAttractionTarget(point);
+                    }
+                });
             }
         }
 
         function onPointerMove(event) {
-            if (!isOrbitMode && isDragging && selectedText) {
+            if (!isOrbitMode && isDragging) {
                 const point = getIntersectionPoint(event);
-                selectedText.setAttractionTarget(point);
+                texts.forEach(text => {
+                    if (text.gravityLine.active) {
+                        text.gravityLine.source.copy(point);
+                        text.setAttractionTarget(point);
+                    }
+                });
             }
         }
 
         function onPointerUp(event) {
-            if (!isOrbitMode && selectedText) {
-                selectedText.releaseAttraction();
-                selectedText = null;
+            if (!isOrbitMode) {
+                texts.forEach(text => {
+                    try {
+                        if (text && text.gravityLine && text.gravityLine.active) {
+                            text.releaseGravityLine();
+                        }
+                    } catch (error) {
+                        console.error('Error releasing gravity line:', error);
+                    }
+                });
                 isDragging = false;
                 controls.enabled = isOrbitMode;
             }
@@ -192,3 +206,15 @@ window.addEventListener('load', function() {
     init();
     animate();
 });
+
+// 添加清理函数
+function cleanup() {
+    texts.forEach(text => {
+        if (text && text.gravityLine && text.gravityLine.active) {
+            text.releaseGravityLine();
+        }
+    });
+}
+
+// 添加页面卸载时的清理
+window.addEventListener('beforeunload', cleanup);
