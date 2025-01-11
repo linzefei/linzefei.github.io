@@ -82,11 +82,11 @@ class Text3D {
 			specular: 0xffffff,
 			shininess: 100,
 			transparent: true,
-			depthWrite: false,
-			renderOrder: 1000 - this.orbit.level
+			depthWrite: false
 		});
 
 		this.mesh = new THREE.Mesh(geometry, material);
+		this.mesh.renderOrder = 1000 - this.orbit.level;
 		geometry.computeBoundingBox();
 		geometry.center();
 		
