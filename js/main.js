@@ -196,6 +196,72 @@ function init() {
             localStorage.setItem('visibleOrbits', visibleOrbits);
         }
 
+        // 重置所有设置到默认状态
+        function resetToDefaults() {
+            try {
+                // 清除所有本地存储
+                localStorage.clear();
+                
+                // 重置操作模式
+                isOrbitMode = true;
+                controls.enabled = true;
+                updateModeButton(elements.modeSwitch, true);
+                
+                // 重置轨迹显示
+                texts.forEach(text => {
+                    if (text && text.orbitLine) {
+                        text.orbitLine.showFullTrail = false;
+                    }
+                });
+                updateTrailButton(elements.trailSwitch, false);
+                
+                // 重置速度
+                const speed = 1.0;
+                elements.speedSlider.value = speed;
+                elements.speedValue.textContent = speed.toFixed(1);
+                texts.forEach(text => {
+                    text.setRotationSpeed(speed);
+                });
+                
+                // 重置轨道显示
+                visibleOrbits = texts.length;
+                texts.forEach((text, index) => {
+                    text.visible = true;
+                    if (text.orbitLine) {
+                        text.orbitLine.visible = true;
+                    }
+                });
+                updateOrbitDisplay();
+                
+                // 重置高级选项显示状态
+                elements.advancedControls.style.display = 'none';
+                elements.showAdvanced.textContent = '显示高级选项';
+                
+                // 重置相机位置和控制器
+                camera.position.set(0, 100, 800);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+                
+                // 重置拖拽状态
+                isDragging = false;
+                selectedText = null;
+                
+                // 保存默认设置
+                saveSettings({
+                    orbitMode: true,
+                    trailMode: false,
+                    visibleOrbits: texts.length,
+                    speed: 1.0,
+                    advancedVisible: false
+                });
+                
+                console.log('Settings reset successfully');
+            } catch (error) {
+                console.error('Error in resetToDefaults:', error);
+            }
+        }
+
         // 添加显示全部轨道按钮事件
         elements.showAllOrbits.addEventListener('click', () => {
             visibleOrbits = texts.length;
@@ -212,65 +278,10 @@ function init() {
             updateOrbitDisplay();
         });
 
-        // 修改重置功能
+        // 修改重置按钮事件监听器
         elements.resetSettings.addEventListener('click', () => {
             if (confirm('确定要重置所有设置吗？这将恢复到默认状态。')) {
-                try {
-                    // 清除所有设置
-                    localStorage.clear();
-                    
-                    // 应用默认设置
-                    isOrbitMode = defaultSettings.orbitMode;
-                    controls.enabled = isOrbitMode;
-                    updateModeButton(elements.modeSwitch, isOrbitMode);
-                    
-                    // 重置轨迹显示
-                    texts.forEach(text => {
-                        if (text && text.orbitLine) {
-                            text.orbitLine.showFullTrail = defaultSettings.trailMode;
-                        }
-                    });
-                    updateTrailButton(elements.trailSwitch, defaultSettings.trailMode);
-                    
-                    // 重置速度
-                    const speed = defaultSettings.speed;
-                    elements.speedSlider.value = speed;
-                    elements.speedValue.textContent = speed.toFixed(1);
-                    texts.forEach(text => {
-                        text.setRotationSpeed(speed);
-                    });
-                    
-                    // 重置轨道显示
-                    visibleOrbits = texts.length;
-                    updateOrbitDisplay();
-                    
-                    // 重置高级选项显示状态
-                    elements.advancedControls.style.display = 'none';
-                    elements.showAdvanced.textContent = '显示高级选项';
-                    
-                    // 重置相机位置和控制器
-                    camera.position.set(0, 100, 800);
-                    camera.lookAt(0, 0, 0);
-                    controls.target.set(0, 0, 0);
-                    controls.update();
-                    
-                    // 保存默认设置到本地存储
-                    saveSettings({
-                        orbitMode: defaultSettings.orbitMode,
-                        trailMode: defaultSettings.trailMode,
-                        visibleOrbits: texts.length,
-                        speed: defaultSettings.speed,
-                        advancedVisible: defaultSettings.advancedVisible
-                    });
-
-                    // 重置拖拽状态
-                    isDragging = false;
-                    selectedText = null;
-
-                    console.log('Settings reset successfully');
-                } catch (error) {
-                    console.error('Error resetting settings:', error);
-                }
+                resetToDefaults();
             }
         });
 
