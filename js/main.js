@@ -110,6 +110,8 @@ function init() {
             trailSwitch: document.getElementById('trail-switch'),
             orbitDebug: document.getElementById('orbit-debug'),
             orbitCount: document.getElementById('orbit-count'),
+            totalOrbits: document.getElementById('total-orbits'),  // 添加总轨道数显示
+            showAllOrbits: document.getElementById('show-all-orbits'),  // 添加显示全部按钮
             speedSlider: document.getElementById('speed-slider'),
             speedValue: document.getElementById('speed-value'),
             showAdvanced: document.getElementById('show-advanced'),
@@ -179,28 +181,97 @@ function init() {
             isDragging = false;
         });
 
-        // 轨道调试按钮事件
-        elements.orbitDebug.addEventListener('click', () => {
-            visibleOrbits = (visibleOrbits % texts.length) + 1;
-            
+        // 更新轨道显示
+        function updateOrbitDisplay() {
             texts.forEach((text, index) => {
                 if (text) {
-                    if (visibleOrbits === 1) {
-                        text.visible = index === 0;
-                        if (text.orbitLine) {
-                            text.orbitLine.visible = index === 0;
-                        }
-                    } else {
-                        text.visible = index < visibleOrbits;
-                        if (text.orbitLine) {
-                            text.orbitLine.visible = index < visibleOrbits;
-                        }
+                    text.visible = index < visibleOrbits;
+                    if (text.orbitLine) {
+                        text.orbitLine.visible = index < visibleOrbits;
                     }
                 }
             });
-            
             elements.orbitCount.textContent = visibleOrbits;
+            elements.totalOrbits.textContent = TextData.getCount() || texts.length;
             localStorage.setItem('visibleOrbits', visibleOrbits);
+        }
+
+        // 添加显示全部轨道按钮事件
+        elements.showAllOrbits.addEventListener('click', () => {
+            visibleOrbits = texts.length;
+            updateOrbitDisplay();
+        });
+
+        // 修改轨道调试按钮事件
+        elements.orbitDebug.addEventListener('click', () => {
+            if (visibleOrbits === texts.length) {
+                visibleOrbits = 1;
+            } else {
+                visibleOrbits = (visibleOrbits % texts.length) + 1;
+            }
+            updateOrbitDisplay();
+        });
+
+        // 修改重置功能
+        elements.resetSettings.addEventListener('click', () => {
+            if (confirm('确定要重置所有设置吗？这将恢复到默认状态。')) {
+                try {
+                    // 清除所有设置
+                    localStorage.clear();
+                    
+                    // 应用默认设置
+                    isOrbitMode = defaultSettings.orbitMode;
+                    controls.enabled = isOrbitMode;
+                    updateModeButton(elements.modeSwitch, isOrbitMode);
+                    
+                    // 重置轨迹显示
+                    texts.forEach(text => {
+                        if (text && text.orbitLine) {
+                            text.orbitLine.showFullTrail = defaultSettings.trailMode;
+                        }
+                    });
+                    updateTrailButton(elements.trailSwitch, defaultSettings.trailMode);
+                    
+                    // 重置速度
+                    const speed = defaultSettings.speed;
+                    elements.speedSlider.value = speed;
+                    elements.speedValue.textContent = speed.toFixed(1);
+                    texts.forEach(text => {
+                        text.setRotationSpeed(speed);
+                    });
+                    
+                    // 重置轨道显示
+                    visibleOrbits = texts.length;
+                    updateOrbitDisplay();
+                    
+                    // 重置高级选项显示状态
+                    elements.advancedControls.style.display = 'none';
+                    elements.showAdvanced.textContent = '显示高级选项';
+                    
+                    // 重置相机位置和控制器
+                    camera.position.set(0, 100, 800);
+                    camera.lookAt(0, 0, 0);
+                    controls.target.set(0, 0, 0);
+                    controls.update();
+                    
+                    // 保存默认设置到本地存储
+                    saveSettings({
+                        orbitMode: defaultSettings.orbitMode,
+                        trailMode: defaultSettings.trailMode,
+                        visibleOrbits: texts.length,
+                        speed: defaultSettings.speed,
+                        advancedVisible: defaultSettings.advancedVisible
+                    });
+
+                    // 重置拖拽状态
+                    isDragging = false;
+                    selectedText = null;
+
+                    console.log('Settings reset successfully');
+                } catch (error) {
+                    console.error('Error resetting settings:', error);
+                }
+            }
         });
 
         // 添加鼠标/触摸事件监听器
@@ -275,14 +346,6 @@ function init() {
                 controls.enabled = isOrbitMode;
             }
         }
-
-        // 添加重置设置功能
-        elements.resetSettings.addEventListener('click', () => {
-            if (confirm('确定要重置所有设置吗？这将恢复到默认状态。')) {
-                localStorage.clear();
-                window.location.reload();
-            }
-        });
     } catch (error) {
         console.error('Error in init:', error);
     }
@@ -295,6 +358,12 @@ function createTexts(font) {
         const savedTrailMode = localStorage.getItem('trailMode');
         const showFullTrail = savedTrailMode !== null ? savedTrailMode === 'true' : false;
         const savedVisibleOrbits = localStorage.getItem('visibleOrbits');
+        
+        // 更新总轨道数显示
+        const totalOrbits = document.getElementById('total-orbits');
+        if (totalOrbits) {
+            totalOrbits.textContent = TextData.getCount();
+        }
         
         // 如果是第一批文字且没有保存的设置，设置为显示所有轨道
         if (!savedVisibleOrbits && texts.length === 0) {
@@ -342,6 +411,11 @@ function createTexts(font) {
             setTimeout(() => {
                 createTexts(font);
             }, 2000);
+        } else {
+            // 所有文字加载完成后，再次更新总轨道数
+            if (totalOrbits) {
+                totalOrbits.textContent = texts.length;
+            }
         }
     } catch (error) {
         console.error('Error creating texts:', error);
