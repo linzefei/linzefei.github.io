@@ -14,7 +14,8 @@ class Text3D {
 				CONFIG.orbits.rotationSpeed.max,
 				Math.random()
 			),
-			tilt: params.level * CONFIG.orbits.tilt  // 根据层级设置倾斜角度
+			tilt: params.level * CONFIG.orbits.tilt,
+			level: params.level || 0  // 保存层级信息
 		};
 		
 		// 自转速度保持不变
@@ -117,6 +118,7 @@ class Text3D {
 					Math.sin(this.orbit.angle) * this.orbit.radius
 				);
 				position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
+				position.z += this.orbit.level * CONFIG.orbits.zOffset;
 				
 				const targetPosition = new THREE.Vector3().copy(this.orbit.center).add(position);
 				
@@ -138,8 +140,8 @@ class Text3D {
 					
 					// 根据速度调整轨迹长度
 					const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
-					const pastArc = Math.PI * (0.2 + speedFactor * 0.1);
-					const futureArc = Math.PI * (0.3 + speedFactor * 0.1);
+					const pastArc = Math.PI * (0.3 + speedFactor * 0.2);   // 增加过去轨迹长度
+					const futureArc = Math.PI * (0.4 + speedFactor * 0.2); // 增加未来轨迹长度
 					
 					// 更新每个点的颜色
 					for (let i = 0; i <= segments; i++) {
@@ -154,19 +156,25 @@ class Text3D {
 						
 						let opacity;
 						if (this.orbitLine.showFullTrail) {
-							opacity = 0.3;
-							if ((i % 4) < 2) {
-								opacity *= 0.5;
+							// 完整轨迹模式
+							opacity = 0.2;
+							if ((i % 6) < 3) { // 调整虚线效果
+								opacity *= 0.7;
 							}
 						} else {
+							// 部分轨迹模式
 							opacity = 0;
 							if (deltaAngle < 0 && deltaAngle > -pastArc) {
-								opacity = Math.cos(deltaAngle * Math.PI / (2 * pastArc)) * 0.6;
+								// 过去的轨迹，使用平滑的余弦过渡
+								const t = -deltaAngle / pastArc;
+								opacity = Math.cos(t * Math.PI * 0.5) * 0.5;
 							} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
-								const progress = deltaAngle / futureArc;
-								const dashPhase = (i / 2) % 1;
-								opacity = Math.cos(progress * Math.PI * 0.5) * 0.3 * 
-										 (Math.cos(dashPhase * Math.PI * 2) * 0.5 + 0.5);
+								// 未来的轨迹，使用虚线效果
+								const t = deltaAngle / futureArc;
+								opacity = (1 - t) * 0.3;
+								if ((i % 4) < 2) { // 虚线效果
+									opacity *= 0.5;
+								}
 							}
 						}
 						
@@ -297,41 +305,38 @@ class Text3D {
 
 	// 修改 createOrbitLine 方法
 	createOrbitLine(scene) {
-		// 创建完整轨道
 		const points = [];
-		const segments = 128;
+		const segments = 180;
 		
-		// 计算轨道平面的法向量
-		const normal = new THREE.Vector3(Math.sin(this.orbit.tilt), Math.cos(this.orbit.tilt), 0);
+		// 计算轨道平面的基准向量
+		const baseMatrix = new THREE.Matrix4().makeRotationX(this.orbit.tilt);
+		
+		// 计算Z轴偏移，确保层级顺序
+		const zOffset = this.orbit.level * CONFIG.orbits.zOffset;
 		
 		// 生成完整轨道的点
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
-			// 先在XZ平面上创建点
 			const x = Math.cos(angle) * this.orbit.radius;
 			const z = Math.sin(angle) * this.orbit.radius;
-			const y = 0;
-			
-			// 创建点并应用倾斜变换
-			const point = new THREE.Vector3(x, y, z);
-			// 根据法向量旋转点
-			point.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
+			const point = new THREE.Vector3(x, 0, z);
+			point.applyMatrix4(baseMatrix);
+			// 添加Z轴偏移
+			point.z += zOffset;
 			points.push(point);
 		}
 
-		// 创建轨道几何体
 		const geometry = new THREE.BufferGeometry().setFromPoints(points);
-		
-		// 创建顶点颜色数组
 		const colors = new Float32Array(points.length * 3);
 		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 		
-		// 创建使用顶点颜色的材质
 		const material = new THREE.LineBasicMaterial({
 			vertexColors: true,
 			transparent: true,
 			depthWrite: false,
-			opacity: 1
+			opacity: 1,
+			// 确保渲染顺序正确
+			renderOrder: -this.orbit.level
 		});
 
 		const line = new THREE.Line(geometry, material);

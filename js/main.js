@@ -203,7 +203,6 @@ function createTexts(font) {
             text3D.create(scene, font);
             text3D.createOrbitLine(scene);
             
-            // 安全地设置轨迹模式
             if (text3D.orbitLine) {
                 text3D.orbitLine.showFullTrail = savedTrailMode;
             }
