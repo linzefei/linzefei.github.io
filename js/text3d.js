@@ -363,11 +363,11 @@ class Text3D {
 			vertexColors: true,
 			transparent: true,
 			depthWrite: false,
-			opacity: 1,
-			renderOrder: 1000 - this.orbit.level
+			opacity: 1
 		});
 
 		const line = new THREE.Line(geometry, material);
+		line.renderOrder = 1000 - this.orbit.level;
 		
 		// 设置轨道线的位置
 		line.position.copy(this.orbit.center);

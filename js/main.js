@@ -81,38 +81,56 @@ function init() {
             controls.target.set(savedControls.target.x, savedControls.target.y, savedControls.target.z);
         }
 
-        // 从本地存储加载所有状态
+        // 从本地存储加载所有状态，设置默认值
         const savedOrbitMode = localStorage.getItem('orbitMode');
         const savedTrailMode = localStorage.getItem('trailMode');
         const savedVisibleOrbits = localStorage.getItem('visibleOrbits');
-        
-        // 设置初始状态
-        isOrbitMode = savedOrbitMode ? savedOrbitMode === 'true' : true;
-        const showFullTrail = savedTrailMode ? savedTrailMode === 'true' : false;
+        const savedSpeed = localStorage.getItem('rotationSpeed');
+        const savedAdvancedVisible = localStorage.getItem('advancedVisible');
+
+        // 设置默认值
+        const defaultSettings = {
+            orbitMode: true,          // 默认：旋转镜头
+            trailMode: false,         // 默认：部分轨迹
+            visibleOrbits: null,      // 默认：等待文字加载后设置
+            speed: 1.0,               // 默认：速度1.0
+            advancedVisible: false    // 默认：高级选项隐藏
+        };
+
+        // 应用设置，优先使用保存的值，否则使用默认值
+        isOrbitMode = savedOrbitMode !== null ? savedOrbitMode === 'true' : defaultSettings.orbitMode;
+        const showFullTrail = savedTrailMode !== null ? savedTrailMode === 'true' : defaultSettings.trailMode;
         visibleOrbits = savedVisibleOrbits ? parseInt(savedVisibleOrbits) : 1;
-        
-        // 添加模式切换按钮的事件监听
-        const modeSwitch = document.getElementById('mode-switch');
-        const trailSwitch = document.getElementById('trail-switch');
-        const orbitDebug = document.getElementById('orbit-debug');
-        const orbitCount = document.getElementById('orbit-count');
-        
-        // 初始化所有按钮状态
-        updateModeButton(modeSwitch, isOrbitMode);
-        updateTrailButton(trailSwitch, showFullTrail);
-        orbitCount.textContent = visibleOrbits;
+        window.initialSpeed = parseFloat(savedSpeed || defaultSettings.speed);
+        const showAdvanced = savedAdvancedVisible === 'true';
+
+        // 获取所有UI元素
+        const elements = {
+            modeSwitch: document.getElementById('mode-switch'),
+            trailSwitch: document.getElementById('trail-switch'),
+            orbitDebug: document.getElementById('orbit-debug'),
+            orbitCount: document.getElementById('orbit-count'),
+            speedSlider: document.getElementById('speed-slider'),
+            speedValue: document.getElementById('speed-value'),
+            showAdvanced: document.getElementById('show-advanced'),
+            advancedControls: document.getElementById('advanced-controls'),
+            resetSettings: document.getElementById('reset-settings')
+        };
+
+        // 更新UI状态
+        updateModeButton(elements.modeSwitch, isOrbitMode);
+        updateTrailButton(elements.trailSwitch, showFullTrail);
+        elements.orbitCount.textContent = visibleOrbits;
+        elements.speedSlider.value = window.initialSpeed;
+        elements.speedValue.textContent = window.initialSpeed;
         controls.enabled = isOrbitMode;
 
-        // 模式切换按钮事件
-        modeSwitch.addEventListener('click', () => {
-            isOrbitMode = !isOrbitMode;
-            updateModeButton(modeSwitch, isOrbitMode);
-            controls.enabled = isOrbitMode;
-            localStorage.setItem('orbitMode', isOrbitMode);
-        });
+        // 设置高级选项的初始状态
+        elements.advancedControls.style.display = showAdvanced ? 'block' : 'none';
+        elements.showAdvanced.textContent = showAdvanced ? '隐藏高级选项' : '显示高级选项';
 
-        // 轨迹模式切换按钮事件
-        trailSwitch.addEventListener('click', () => {
+        // 添加轨迹切换按钮事件
+        elements.trailSwitch.addEventListener('click', () => {
             const currentState = texts.length > 0 ? texts[0].orbitLine.showFullTrail : false;
             const newState = !currentState;
             
@@ -122,12 +140,47 @@ function init() {
                 }
             });
             
-            updateTrailButton(trailSwitch, newState);
+            updateTrailButton(elements.trailSwitch, newState);
             localStorage.setItem('trailMode', newState);
         });
 
+        // 添加高级选项的事件监听
+        elements.showAdvanced.addEventListener('click', () => {
+            const isVisible = elements.advancedControls.style.display === 'none';
+            elements.advancedControls.style.display = isVisible ? 'block' : 'none';
+            elements.showAdvanced.textContent = isVisible ? '隐藏高级选项' : '显示高级选项';
+            localStorage.setItem('advancedVisible', isVisible);
+        });
+
+        // 添加速度控制事件监听
+        elements.speedSlider.addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            elements.speedValue.textContent = speed.toFixed(1);
+            
+            texts.forEach(text => {
+                text.setRotationSpeed(speed);
+            });
+            
+            localStorage.setItem('rotationSpeed', speed);
+        });
+
+        // 如果是新用户，保存默认设置
+        if (savedOrbitMode === null) {
+            saveSettings(defaultSettings);
+        }
+
+        // 添加模式切换按钮的事件监听
+        elements.modeSwitch.addEventListener('click', () => {
+            isOrbitMode = !isOrbitMode;
+            updateModeButton(elements.modeSwitch, isOrbitMode);
+            controls.enabled = isOrbitMode;
+            localStorage.setItem('orbitMode', isOrbitMode);
+            // 重置拖拽状态
+            isDragging = false;
+        });
+
         // 轨道调试按钮事件
-        orbitDebug.addEventListener('click', () => {
+        elements.orbitDebug.addEventListener('click', () => {
             visibleOrbits = (visibleOrbits % texts.length) + 1;
             
             texts.forEach((text, index) => {
@@ -146,7 +199,7 @@ function init() {
                 }
             });
             
-            orbitCount.textContent = visibleOrbits;
+            elements.orbitCount.textContent = visibleOrbits;
             localStorage.setItem('visibleOrbits', visibleOrbits);
         });
 
@@ -223,28 +276,12 @@ function init() {
             }
         }
 
-        // 添加速度控制
-        const speedSlider = document.getElementById('speed-slider');
-        const speedValue = document.getElementById('speed-value');
-        const savedSpeed = localStorage.getItem('rotationSpeed') || '1.0';
-        
-        // 设置滑块和显示值
-        speedSlider.value = savedSpeed;
-        speedValue.textContent = savedSpeed;
-
-        // 在创建文字时应用保存的速度
-        window.initialSpeed = parseFloat(savedSpeed); // 添加全局变量存储初始速度
-
-        speedSlider.addEventListener('input', (e) => {
-            const speed = parseFloat(e.target.value);
-            speedValue.textContent = speed.toFixed(1);
-            
-            // 更新所有文字的速度
-            texts.forEach(text => {
-                text.setRotationSpeed(speed);
-            });
-            
-            localStorage.setItem('rotationSpeed', speed);
+        // 添加重置设置功能
+        elements.resetSettings.addEventListener('click', () => {
+            if (confirm('确定要重置所有设置吗？这将恢复到默认状态。')) {
+                localStorage.clear();
+                window.location.reload();
+            }
         });
     } catch (error) {
         console.error('Error in init:', error);
@@ -255,9 +292,20 @@ function createTexts(font) {
     try {
         let previousText = null;
         const items = TextData.getNextPage();
-        const savedTrailMode = localStorage.getItem('trailMode') === 'true';
-        const savedVisibleOrbits = parseInt(localStorage.getItem('visibleOrbits')) || 1;
+        const savedTrailMode = localStorage.getItem('trailMode');
+        const showFullTrail = savedTrailMode !== null ? savedTrailMode === 'true' : false;
+        const savedVisibleOrbits = localStorage.getItem('visibleOrbits');
         
+        // 如果是第一批文字且没有保存的设置，设置为显示所有轨道
+        if (!savedVisibleOrbits && texts.length === 0) {
+            visibleOrbits = items.length;
+            saveSettings({ visibleOrbits: visibleOrbits });
+            const orbitCount = document.getElementById('orbit-count');
+            if (orbitCount) {
+                orbitCount.textContent = visibleOrbits;
+            }
+        }
+
         items.forEach((item, index) => {
             const radius = CONFIG.orbits.baseRadius + 
                          (index * CONFIG.orbits.radiusIncrement);
@@ -280,10 +328,10 @@ function createTexts(font) {
             }
             
             if (text3D.orbitLine) {
-                text3D.orbitLine.showFullTrail = savedTrailMode;
-                text3D.orbitLine.visible = index < savedVisibleOrbits;
+                text3D.orbitLine.showFullTrail = showFullTrail;
+                text3D.orbitLine.visible = index < visibleOrbits;
             }
-            text3D.visible = index < savedVisibleOrbits;
+            text3D.visible = index < visibleOrbits;
             
             texts.push(text3D);
             previousText = text3D;
@@ -403,3 +451,17 @@ function autoSaveState() {
 
 // 每5秒自动保存一次状态
 setInterval(autoSaveState, 5000);
+
+// 添加保存设置的辅助函数
+function saveSettings(settings) {
+    if (settings.orbitMode !== undefined) 
+        localStorage.setItem('orbitMode', settings.orbitMode);
+    if (settings.trailMode !== undefined) 
+        localStorage.setItem('trailMode', settings.trailMode);
+    if (settings.visibleOrbits !== undefined) 
+        localStorage.setItem('visibleOrbits', settings.visibleOrbits);
+    if (settings.speed !== undefined) 
+        localStorage.setItem('rotationSpeed', settings.speed);
+    if (settings.advancedVisible !== undefined) 
+        localStorage.setItem('advancedVisible', settings.advancedVisible);
+}
