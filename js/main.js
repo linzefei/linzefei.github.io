@@ -17,6 +17,27 @@ let visibleOrbits = 1; // 当前显示的轨道数量
 // 定义全局 elements 对象
 let elements;
 
+// 将 updateOrbitDisplay 移到全局作用域
+function updateOrbitDisplay() {
+    try {
+        texts.forEach((text, index) => {
+            if (text) {
+                text.visible = index < visibleOrbits;
+                if (text.orbitLine) {
+                    text.orbitLine.visible = index < visibleOrbits;
+                }
+            }
+        });
+        if (elements) {
+            elements.orbitCount.textContent = visibleOrbits;
+            elements.totalOrbits.textContent = TextData.getCount() || texts.length;
+        }
+        localStorage.setItem('visibleOrbits', visibleOrbits);
+    } catch (error) {
+        console.error('Error in updateOrbitDisplay:', error);
+    }
+}
+
 function init() {
     try {
         // 创建场景
@@ -200,21 +221,6 @@ function init() {
             // 重置拖拽状态
             isDragging = false;
         });
-
-        // 更新轨道显示
-        function updateOrbitDisplay() {
-            texts.forEach((text, index) => {
-                if (text) {
-                    text.visible = index < visibleOrbits;
-                    if (text.orbitLine) {
-                        text.orbitLine.visible = index < visibleOrbits;
-                    }
-                }
-            });
-            elements.orbitCount.textContent = visibleOrbits;
-            elements.totalOrbits.textContent = TextData.getCount() || texts.length;
-            localStorage.setItem('visibleOrbits', visibleOrbits);
-        }
 
         // 修改重置按钮事件监听器
         elements.resetSettings.addEventListener('click', () => {
