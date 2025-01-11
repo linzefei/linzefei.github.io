@@ -120,10 +120,11 @@ class Text3D {
 				
 				const targetPosition = new THREE.Vector3().copy(this.orbit.center).add(position);
 				
-				// 更新文字位置
-				this.mesh.position.lerp(targetPosition, 0.1);
+				// 更新文字位置，使用轨道速度来调整移动速度
+				const moveSpeed = Math.min(0.1, this.orbit.speed * 0.05);
+				this.mesh.position.lerp(targetPosition, moveSpeed);
 
-				// 更新轨道线颜色
+				// 更新轨道线
 				if (this.orbitLine.line) {
 					const colors = this.orbitLine.colors;
 					const segments = this.orbitLine.segments;
@@ -132,23 +133,23 @@ class Text3D {
 					const direction = this.mesh.position.clone().sub(this.orbit.center);
 					const currentAngle = Math.atan2(direction.z, direction.x);
 					
+					// 根据速度调整轨迹长度
+					const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
+					const pastArc = Math.PI * (0.2 + speedFactor * 0.1);   // 速度越快，轨迹越长
+					const futureArc = Math.PI * (0.3 + speedFactor * 0.1);  // 速度越快，预示轨迹越长
+					
 					// 更新每个点的颜色
 					for (let i = 0; i <= segments; i++) {
 						const angle = (i / segments) * Math.PI * 2;
 						
-						// 计算与当前位置的角度差
 						let deltaAngle = angle - currentAngle;
 						while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
 						while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 						
-						// 设置颜色和透明度
 						const colorIndex = i * 3;
 						const color = new THREE.Color(this.params.color);
 						
-						// 计算透明度
 						let opacity = 0;
-						const pastArc = Math.PI * 0.3;   // 增加过去轨迹长度
-						const futureArc = Math.PI * 0.4;  // 增加未来轨迹长度
 						
 						if (deltaAngle < 0 && deltaAngle > -pastArc) {
 							// 过去的轨迹，使用平滑的余弦过渡
@@ -156,7 +157,7 @@ class Text3D {
 						} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
 							// 未来的轨迹，使用虚线效果
 							const progress = deltaAngle / futureArc;
-							const dashPhase = (i / 2) % 1; // 创建更明显的虚线效果
+							const dashPhase = (i / 2) % 1;
 							opacity = Math.cos(progress * Math.PI * 0.5) * 0.3 * 
 									 (Math.cos(dashPhase * Math.PI * 2) * 0.5 + 0.5);
 						}
