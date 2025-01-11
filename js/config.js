@@ -7,13 +7,13 @@ const CONFIG = {
 	// 轨道配置
 	orbits: {
 		baseRadius: 100,      // 基础轨道半径
-		radiusIncrement: 50,  // 每层轨道半径增量
+		radiusIncrement: 100, // 增加轨道间距，避免碰撞
 		rotationSpeed: {
 			min: 0.2,
-			max: 1.0
+			max: 0.8          // 降低最大速度，使运动更平稳
 		},
-		tilt: 0.1,            // 轨道倾斜角度
-		zOffset: 0.5         // 添加Z轴偏移量，控制轨道层级
+		tilt: 0.15,          // 增加倾斜角度，使轨道层次更分明
+		zOffset: 1.0         // 增加Z轴偏移，加强层次感
 	},
 
 	// 场景边界

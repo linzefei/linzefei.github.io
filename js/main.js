@@ -207,6 +207,28 @@ function init() {
                 controls.enabled = isOrbitMode;
             }
         }
+
+        // 添加速度控制
+        const speedSlider = document.getElementById('speed-slider');
+        const speedValue = document.getElementById('speed-value');
+        const savedSpeed = localStorage.getItem('rotationSpeed');
+        
+        if (savedSpeed) {
+            speedSlider.value = savedSpeed;
+            speedValue.textContent = savedSpeed;
+        }
+
+        speedSlider.addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            speedValue.textContent = speed.toFixed(1);
+            
+            // 更新所有文字的速度
+            texts.forEach(text => {
+                text.setRotationSpeed(speed);
+            });
+            
+            localStorage.setItem('rotationSpeed', speed);
+        });
     } catch (error) {
         console.error('Error in init:', error);
     }

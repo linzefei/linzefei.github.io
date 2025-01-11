@@ -60,6 +60,9 @@ class Text3D {
 		
 		// 添加整体可见性控制
 		this.visible = false;
+		
+		// 添加基础速度属性
+		this.baseSpeed = 1.0;
 	}
 
 	create(scene, font) {
@@ -77,7 +80,10 @@ class Text3D {
 		const material = new THREE.MeshPhongMaterial({
 			color: this.params.color,
 			specular: 0xffffff,
-			shininess: 100
+			shininess: 100,
+			transparent: true,
+			depthWrite: false,
+			renderOrder: 1000 - this.orbit.level
 		});
 
 		this.mesh = new THREE.Mesh(geometry, material);
@@ -120,20 +126,19 @@ class Text3D {
 						this.orbitLine.line.visible = false;
 					}
 				} else {
-					// 正常轨道运动
-					this.orbit.angle += this.orbit.speed * 0.01;
+					// 使用基础速度调整角度增量
+					this.orbit.angle += this.orbit.speed * 0.01 * this.baseSpeed;
 					
-					// 计算基础轨道位置
+					// 使用相同的矩阵变换计算位置
+					const tiltMatrix = new THREE.Matrix4().makeRotationX(this.orbit.tilt);
 					const position = new THREE.Vector3(
 						Math.cos(this.orbit.angle) * this.orbit.radius,
 						0,
-						Math.sin(this.orbit.angle) * this.orbit.radius
+							Math.sin(this.orbit.angle) * this.orbit.radius
 					);
+					position.applyMatrix4(tiltMatrix);
 					
-					// 应用倾斜
-					position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
-					
-					// 添加中心点偏移和Z轴偏移
+					// 计算最终位置
 					const targetPosition = new THREE.Vector3()
 						.copy(this.orbit.center)
 						.add(position);
@@ -144,63 +149,43 @@ class Text3D {
 					this.mesh.position.lerp(targetPosition, moveSpeed);
 
 					// 更新轨道线
-					if (this.orbitLine.line) {
-						// 根据可见性控制显示
-						this.orbitLine.line.visible = this.orbitLine.visible;
+					if (this.orbitLine.line && this.orbitLine.visible) {
+						const colors = this.orbitLine.colors;
+						const segments = this.orbitLine.segments;
 						
-						if (this.orbitLine.visible) {
-							// 只有在轨道可见时才更新颜色
-							const colors = this.orbitLine.colors;
-							const segments = this.orbitLine.segments;
+						// 计算当前角度
+						const currentAngle = this.orbit.angle;
+						
+						// 更新颜色
+						for (let i = 0; i <= segments; i++) {
+							const angle = (i / segments) * Math.PI * 2;
+							let deltaAngle = angle - currentAngle;
+							while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
+							while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
 							
-							// 计算实际角度 - 移除Z轴偏移后计算
-							const actualPosition = this.mesh.position.clone().sub(this.orbit.center);
-							actualPosition.z -= this.orbit.level * CONFIG.orbits.zOffset;
-							const currentAngle = Math.atan2(actualPosition.z, actualPosition.x);
+							const colorIndex = i * 3;
+							const color = new THREE.Color(this.params.color);
 							
-							// 根据速度调整轨迹长度
-							const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
-							const pastArc = Math.PI * (0.3 + speedFactor * 0.2);
-							const futureArc = Math.PI * (0.4 + speedFactor * 0.2);
-							
-							// 更新每个点的颜色
-							for (let i = 0; i <= segments; i++) {
-								const angle = (i / segments) * Math.PI * 2;
-								
-								let deltaAngle = angle - currentAngle;
-								while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
-								while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
-								
-								const colorIndex = i * 3;
-								const color = new THREE.Color(this.params.color);
-								
-								let opacity;
-								if (this.orbitLine.showFullTrail) {
-									opacity = 0.2;
-									if ((i % 6) < 3) {
-										opacity *= 0.7;
-									}
-								} else {
-									opacity = 0;
-									if (deltaAngle < 0 && deltaAngle > -pastArc) {
-										const t = -deltaAngle / pastArc;
-										opacity = Math.cos(t * Math.PI * 0.5) * 0.5;
-									} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
-										const t = deltaAngle / futureArc;
-										opacity = (1 - t) * 0.3;
-										if ((i % 4) < 2) {
-											opacity *= 0.5;
-										}
-									}
+							let opacity;
+							if (this.orbitLine.showFullTrail) {
+								opacity = 0.2;
+								if ((i % 6) < 3) opacity *= 0.7;
+							} else {
+								opacity = 0;
+								if (deltaAngle < 0 && deltaAngle > -Math.PI * 0.3) {
+									opacity = Math.cos(deltaAngle * 1.5) * 0.5;
+								} else if (deltaAngle >= 0 && deltaAngle < Math.PI * 0.4) {
+									opacity = (1 - deltaAngle / (Math.PI * 0.4)) * 0.3;
+									if ((i % 4) < 2) opacity *= 0.5;
 								}
-								
-								colors[colorIndex] = color.r * opacity;
-								colors[colorIndex + 1] = color.g * opacity;
-								colors[colorIndex + 2] = color.b * opacity;
 							}
 							
-							this.orbitLine.line.geometry.attributes.color.needsUpdate = true;
+							colors[colorIndex] = color.r * opacity;
+							colors[colorIndex + 1] = color.g * opacity;
+							colors[colorIndex + 2] = color.b * opacity;
 						}
+						
+						this.orbitLine.line.geometry.attributes.color.needsUpdate = true;
 					}
 				}
 
@@ -326,13 +311,18 @@ class Text3D {
 		const points = [];
 		const segments = 180;
 		
-		// 生成完整轨道的点 - 不在这里应用Z轴偏移
+		// 生成完整轨道的点
+		const center = new THREE.Vector3(0, 0, 0);
+		const tiltMatrix = new THREE.Matrix4().makeRotationX(this.orbit.tilt);
+		
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
+			// 先创建平面上的点
 			const x = Math.cos(angle) * this.orbit.radius;
 			const z = Math.sin(angle) * this.orbit.radius;
 			const point = new THREE.Vector3(x, 0, z);
-			point.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
+			// 使用矩阵变换应用倾斜，确保精确性
+			point.applyMatrix4(tiltMatrix);
 			points.push(point);
 		}
 
@@ -344,20 +334,22 @@ class Text3D {
 			vertexColors: true,
 			transparent: true,
 			depthWrite: false,
-			opacity: 1
+			opacity: 1,
+			renderOrder: 1000 - this.orbit.level
 		});
 
 		const line = new THREE.Line(geometry, material);
-		// 将Z轴偏移应用到整个线条的位置
-		const position = new THREE.Vector3().copy(this.orbit.center);
-		position.z += this.orbit.level * CONFIG.orbits.zOffset;
-		line.position.copy(position);
+		
+		// 设置轨道线的位置
+		line.position.copy(this.orbit.center);
+		line.position.z += this.orbit.level * CONFIG.orbits.zOffset;
 		
 		this.orbitLine = {
 			line: line,
 			segments: segments,
 			colors: colors,
-			showFullTrail: false
+			showFullTrail: false,
+			visible: false
 		};
 		
 		scene.add(line);
@@ -394,5 +386,16 @@ class Text3D {
 			scene.remove(this.orbitLine.line);
 			this.orbitLine.line = null;
 		}
+	}
+
+	// 添加速度控制方法
+	setRotationSpeed(speed) {
+		this.baseSpeed = speed;
+		// 保持原有的随机性，但基于新的基础速度
+		this.orbit.speed = THREE.MathUtils.lerp(
+			CONFIG.orbits.rotationSpeed.min * speed,
+			CONFIG.orbits.rotationSpeed.max * speed,
+			Math.random()
+		);
 	}
 }
