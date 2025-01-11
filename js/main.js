@@ -65,25 +65,43 @@ function init() {
         controls.maxDistance = 1500;
         controls.maxPolarAngle = Math.PI;
 
+        // 从本地存储加载上次的状态
+        const savedOrbitMode = localStorage.getItem('orbitMode');
+        const savedTrailMode = localStorage.getItem('trailMode');
+        
+        isOrbitMode = savedOrbitMode ? savedOrbitMode === 'true' : true;
+        const showFullTrail = savedTrailMode ? savedTrailMode === 'true' : false;
+        
         // 添加模式切换按钮的事件监听
         const modeSwitch = document.getElementById('mode-switch');
-        const modeLabel = document.getElementById('mode-label');
+        const trailSwitch = document.getElementById('trail-switch');
+        
+        // 初始化按钮状态
+        updateModeButton(modeSwitch, isOrbitMode);
+        updateTrailButton(trailSwitch, showFullTrail);
+        controls.enabled = isOrbitMode;
 
         modeSwitch.addEventListener('click', () => {
             isOrbitMode = !isOrbitMode;
+            updateModeButton(modeSwitch, isOrbitMode);
             controls.enabled = isOrbitMode;
-            modeLabel.textContent = `当前模式：${isOrbitMode ? '场景旋转' : '文字引力'}`;
+            localStorage.setItem('orbitMode', isOrbitMode);
         });
 
         // 添加轨迹模式切换按钮的事件监听
-        const trailSwitch = document.getElementById('trail-switch');
         trailSwitch.addEventListener('click', () => {
-            // 切换所有文字的轨迹显示模式
+            // 安全地获取当前状态
+            const currentState = texts.length > 0 ? texts[0].orbitLine.showFullTrail : false;
+            const newState = !currentState;
+            
             texts.forEach(text => {
-                text.orbitLine.showFullTrail = !text.orbitLine.showFullTrail;
+                if (text && text.orbitLine) {
+                    text.orbitLine.showFullTrail = newState;
+                }
             });
-            // 更新按钮文本
-            trailSwitch.textContent = `轨迹模式：${texts[0]?.orbitLine.showFullTrail ? '完整' : '部分'}`;
+            
+            updateTrailButton(trailSwitch, newState);
+            localStorage.setItem('trailMode', newState);
         });
 
         // 添加鼠标/触摸事件监听器
@@ -167,6 +185,7 @@ function createTexts(font) {
     try {
         let previousText = null;
         const items = TextData.getNextPage();
+        const savedTrailMode = localStorage.getItem('trailMode') === 'true';
         
         items.forEach((item, index) => {
             const radius = CONFIG.orbits.baseRadius + 
@@ -183,6 +202,12 @@ function createTexts(font) {
 
             text3D.create(scene, font);
             text3D.createOrbitLine(scene);
+            
+            // 安全地设置轨迹模式
+            if (text3D.orbitLine) {
+                text3D.orbitLine.showFullTrail = savedTrailMode;
+            }
+            
             texts.push(text3D);
             previousText = text3D;
         });
@@ -233,3 +258,15 @@ function cleanup() {
 
 // 添加页面卸载时的清理
 window.addEventListener('beforeunload', cleanup);
+
+// 更新模式切换按钮的状态
+function updateModeButton(button, isOrbitMode) {
+    button.textContent = `操作模式：${isOrbitMode ? '旋转镜头' : '发出引力'}`;
+    button.classList.toggle('active', !isOrbitMode);
+}
+
+// 更新轨迹模式按钮的状态
+function updateTrailButton(button, isFullTrail) {
+    button.textContent = `轨迹显示：${isFullTrail ? '完整' : '部分'}`;
+    button.classList.toggle('active', isFullTrail);
+}

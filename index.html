@@ -41,6 +41,21 @@
 			color: white;
 			font-family: Arial, sans-serif;
 		}
+		.control-button {
+			padding: 8px 16px;
+			border: none;
+			border-radius: 4px;
+			background: #4CAF50;
+			color: white;
+			cursor: pointer;
+			font-size: 14px;
+		}
+		.control-button:hover {
+			background: #45a049;
+		}
+		.control-button.active {
+			background: #2196F3;
+		}
 	</style>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -48,9 +63,8 @@
 
 <body>
 	<div id="controls">
-		<span id="mode-label">当前模式：场景旋转</span>
-		<button id="mode-switch">切换模式</button>
-		<button id="trail-switch">轨迹模式：部分</button>
+		<button id="mode-switch" class="control-button">操作模式：旋转镜头</button>
+		<button id="trail-switch" class="control-button">轨迹显示：部分</button>
 	</div>
 	<script src="js/textData.js"></script>
 	<script src="js/config.js"></script>

@@ -131,7 +131,10 @@ class Text3D {
 					
 					// 获取文字当前位置相对于轨道中心的方向
 					const direction = this.mesh.position.clone().sub(this.orbit.center);
-					const currentAngle = Math.atan2(direction.z, direction.x);
+					// 将方向向量投影到轨道平面上
+					const projectedDirection = direction.clone();
+					projectedDirection.applyAxisAngle(new THREE.Vector3(1, 0, 0), -this.orbit.tilt);
+					const currentAngle = Math.atan2(projectedDirection.z, projectedDirection.x);
 					
 					// 根据速度调整轨迹长度
 					const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
@@ -151,13 +154,11 @@ class Text3D {
 						
 						let opacity;
 						if (this.orbitLine.showFullTrail) {
-							// 完整轨迹模式：显示整个轨道
 							opacity = 0.3;
-							if ((i % 4) < 2) { // 创建虚线效果
+							if ((i % 4) < 2) {
 								opacity *= 0.5;
 							}
 						} else {
-							// 部分轨迹模式：只显示文字前后的轨迹
 							opacity = 0;
 							if (deltaAngle < 0 && deltaAngle > -pastArc) {
 								opacity = Math.cos(deltaAngle * Math.PI / (2 * pastArc)) * 0.6;
@@ -298,14 +299,23 @@ class Text3D {
 	createOrbitLine(scene) {
 		// 创建完整轨道
 		const points = [];
-		const segments = 128; // 增加分段数，使轨迹更平滑
+		const segments = 128;
+		
+		// 计算轨道平面的法向量
+		const normal = new THREE.Vector3(Math.sin(this.orbit.tilt), Math.cos(this.orbit.tilt), 0);
 		
 		// 生成完整轨道的点
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
+			// 先在XZ平面上创建点
 			const x = Math.cos(angle) * this.orbit.radius;
 			const z = Math.sin(angle) * this.orbit.radius;
-			const point = new THREE.Vector3(x, 0, z);
+			const y = 0;
+			
+			// 创建点并应用倾斜变换
+			const point = new THREE.Vector3(x, y, z);
+			// 根据法向量旋转点
+			point.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
 			points.push(point);
 		}
 
@@ -326,12 +336,12 @@ class Text3D {
 
 		const line = new THREE.Line(geometry, material);
 		line.position.copy(this.orbit.center);
-		line.rotation.x = this.orbit.tilt;
 		
 		this.orbitLine = {
 			line: line,
 			segments: segments,
-			colors: colors
+			colors: colors,
+			showFullTrail: false
 		};
 		
 		scene.add(line);
