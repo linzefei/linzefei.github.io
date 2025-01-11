@@ -7,6 +7,23 @@ class TextDataManager {
         
         // 移除颜色数组，改用颜色生成方法
         this.baseHues = [0, 60, 120, 180, 240, 300]; // 基础色相值（红、黄、绿、青、蓝、紫）
+        
+        // 修改显示顺序，Hello World! 作为最内层
+        this.displayOrder = [
+            'Hello World!',  // 最内层
+            'Three.js',
+            'JavaScript',
+            'Python',
+            'Java',
+            'C++',
+            'React',
+            'Vue',
+            'Angular',
+            'Node.js',
+            'linzefei',
+            'Cursor',
+            '2025'         // 最外层
+        ];
     }
 
     // 使用文本内容生成确定性的颜色
@@ -96,8 +113,16 @@ class TextDataManager {
     // 获取下一页文字
     getNextPage() {
         const start = this.currentPage * this.pageSize;
-        const end = start + this.pageSize;
-        const items = this.items.slice(start, end);
+        const end = Math.min(start + this.pageSize, this.displayOrder.length);
+        
+        // 根据显示顺序返回文本
+        const items = this.displayOrder.slice(start, end).map(text => {
+            // 如果文本不在 items 中，先添加它
+            if (!this.items.find(item => item.text === text)) {
+                this.addText(text);
+            }
+            return this.items.find(item => item.text === text);
+        }).filter(item => item); // 过滤掉可能的空值
         
         if (items.length > 0) {
             this.currentPage++;
@@ -131,19 +156,5 @@ class TextDataManager {
 // 创建全局实例
 const TextData = new TextDataManager();
 
-// 初始化一些示例数据
-TextData.addTexts([
-    'Hello World!',
-    'Three.js',
-    'JavaScript',
-    'Python',
-    'Java',
-    'C++',
-    'React',
-    'Vue',
-    'Angular',
-    'Node.js',
-    "2025",
-    "linzefei",
-    "Cursor"
-]); 
+// 初始化数据（可以移除这部分，因为我们现在使用 displayOrder）
+// TextData.addTexts([...]); 
