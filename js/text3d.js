@@ -87,8 +87,9 @@ class Text3D {
 		if (!this.mesh) return;
 
 		try {
-			// 更新引力线
-			this.updateGravityLine();
+			if (this.gravityLine.active) {
+				this.updateGravityLine();
+			}
 
 			if (this.attraction.active) {
 				// 计算引力效果
@@ -100,10 +101,9 @@ class Text3D {
 					// 添加原有轨道运动的影响
 					const orbitForce = this.calculateOrbitForce();
 					this.mesh.position.add(direction.multiplyScalar(this.gravityLine.strength * distance));
-					this.mesh.position.add(orbitForce.multiplyScalar(0.3)); // 保持部分轨道运动
+					this.mesh.position.add(orbitForce.multiplyScalar(0.3));
 				}
 				
-				// 如果处于吸引状态，隐藏轨道线
 				if (this.orbitLine.line) {
 					this.orbitLine.line.visible = false;
 				}
@@ -111,18 +111,23 @@ class Text3D {
 				// 正常轨道运动
 				this.orbit.angle += this.orbit.speed * 0.01;
 				
-				// 计算目标位置
+				// 计算基础轨道位置
 				const position = new THREE.Vector3(
 					Math.cos(this.orbit.angle) * this.orbit.radius,
 					0,
 					Math.sin(this.orbit.angle) * this.orbit.radius
 				);
+				
+				// 应用倾斜
 				position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
-				position.z += this.orbit.level * CONFIG.orbits.zOffset;
 				
-				const targetPosition = new THREE.Vector3().copy(this.orbit.center).add(position);
+				// 添加中心点偏移和Z轴偏移
+				const targetPosition = new THREE.Vector3()
+					.copy(this.orbit.center)
+					.add(position);
+				targetPosition.z += this.orbit.level * CONFIG.orbits.zOffset;
 				
-				// 更新文字位置，使用轨道速度来调整移动速度
+				// 更新文字位置
 				const moveSpeed = Math.min(0.1, this.orbit.speed * 0.05);
 				this.mesh.position.lerp(targetPosition, moveSpeed);
 
@@ -131,17 +136,15 @@ class Text3D {
 					const colors = this.orbitLine.colors;
 					const segments = this.orbitLine.segments;
 					
-					// 获取文字当前位置相对于轨道中心的方向
-					const direction = this.mesh.position.clone().sub(this.orbit.center);
-					// 将方向向量投影到轨道平面上
-					const projectedDirection = direction.clone();
-					projectedDirection.applyAxisAngle(new THREE.Vector3(1, 0, 0), -this.orbit.tilt);
-					const currentAngle = Math.atan2(projectedDirection.z, projectedDirection.x);
+					// 计算实际角度 - 移除Z轴偏移后计算
+					const actualPosition = this.mesh.position.clone().sub(this.orbit.center);
+					actualPosition.z -= this.orbit.level * CONFIG.orbits.zOffset;
+					const currentAngle = Math.atan2(actualPosition.z, actualPosition.x);
 					
 					// 根据速度调整轨迹长度
 					const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
-					const pastArc = Math.PI * (0.3 + speedFactor * 0.2);   // 增加过去轨迹长度
-					const futureArc = Math.PI * (0.4 + speedFactor * 0.2); // 增加未来轨迹长度
+					const pastArc = Math.PI * (0.3 + speedFactor * 0.2);
+					const futureArc = Math.PI * (0.4 + speedFactor * 0.2);
 					
 					// 更新每个点的颜色
 					for (let i = 0; i <= segments; i++) {
@@ -156,23 +159,19 @@ class Text3D {
 						
 						let opacity;
 						if (this.orbitLine.showFullTrail) {
-							// 完整轨迹模式
 							opacity = 0.2;
-							if ((i % 6) < 3) { // 调整虚线效果
+							if ((i % 6) < 3) {
 								opacity *= 0.7;
 							}
 						} else {
-							// 部分轨迹模式
 							opacity = 0;
 							if (deltaAngle < 0 && deltaAngle > -pastArc) {
-								// 过去的轨迹，使用平滑的余弦过渡
 								const t = -deltaAngle / pastArc;
 								opacity = Math.cos(t * Math.PI * 0.5) * 0.5;
 							} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
-								// 未来的轨迹，使用虚线效果
 								const t = deltaAngle / futureArc;
 								opacity = (1 - t) * 0.3;
-								if ((i % 4) < 2) { // 虚线效果
+								if ((i % 4) < 2) {
 									opacity *= 0.5;
 								}
 							}
@@ -198,12 +197,13 @@ class Text3D {
 		}
 	}
 
-	// 添加新方法
+	// 添加 setAttractionTarget 方法
 	setAttractionTarget(point) {
 		this.attraction.target.copy(point);
 		this.attraction.active = true;
 	}
 
+	// 添加 releaseAttraction 方法
 	releaseAttraction() {
 		this.attraction.active = false;
 	}
@@ -308,21 +308,13 @@ class Text3D {
 		const points = [];
 		const segments = 180;
 		
-		// 计算轨道平面的基准向量
-		const baseMatrix = new THREE.Matrix4().makeRotationX(this.orbit.tilt);
-		
-		// 计算Z轴偏移，确保层级顺序
-		const zOffset = this.orbit.level * CONFIG.orbits.zOffset;
-		
-		// 生成完整轨道的点
+		// 生成完整轨道的点 - 不在这里应用Z轴偏移
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
 			const x = Math.cos(angle) * this.orbit.radius;
 			const z = Math.sin(angle) * this.orbit.radius;
 			const point = new THREE.Vector3(x, 0, z);
-			point.applyMatrix4(baseMatrix);
-			// 添加Z轴偏移
-			point.z += zOffset;
+			point.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
 			points.push(point);
 		}
 
@@ -334,13 +326,14 @@ class Text3D {
 			vertexColors: true,
 			transparent: true,
 			depthWrite: false,
-			opacity: 1,
-			// 确保渲染顺序正确
-			renderOrder: -this.orbit.level
+			opacity: 1
 		});
 
 		const line = new THREE.Line(geometry, material);
-		line.position.copy(this.orbit.center);
+		// 将Z轴偏移应用到整个线条的位置
+		const position = new THREE.Vector3().copy(this.orbit.center);
+		position.z += this.orbit.level * CONFIG.orbits.zOffset;
+		line.position.copy(position);
 		
 		this.orbitLine = {
 			line: line,
