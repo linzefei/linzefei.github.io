@@ -4,9 +4,9 @@ class Text3D {
 		this.mesh = null;
 		this.params = params;
 		
-		// 修改轨道参数
+		// 修改轨道参数，确保固定轨道
 		this.orbit = {
-			center: params.center || new THREE.Vector3(0, 0, 0), // 轨道中心点
+			center: new THREE.Vector3(0, 0, 0), // 统一使用原点作为中心
 			radius: params.radius || CONFIG.orbits.baseRadius,
 			angle: Math.random() * Math.PI * 2,
 			speed: THREE.MathUtils.lerp(
@@ -15,7 +15,7 @@ class Text3D {
 				Math.random()
 			),
 			tilt: params.level * CONFIG.orbits.tilt,
-			level: params.level || 0  // 保存层级信息
+			level: params.level || 0
 		};
 		
 		// 自转速度保持不变
@@ -97,14 +97,38 @@ class Text3D {
 		if (!this.mesh) return;
 
 		try {
-			// 控制文字和轨道线的可见性
 			this.mesh.visible = this.visible;
 			if (this.orbitLine.line) {
 				this.orbitLine.line.visible = this.visible && this.orbitLine.visible;
 			}
 
-			// 只有在可见时才更新位置和轨迹
 			if (this.visible) {
+				if (!this.attraction.active) {
+					// 更新角度
+					this.orbit.angle += this.orbit.speed * 0.01 * this.baseSpeed;
+
+					// 计算基础位置（XZ平面上的圆）
+					const basePosition = new THREE.Vector3(
+						Math.cos(this.orbit.angle) * this.orbit.radius,
+						0,
+						Math.sin(this.orbit.angle) * this.orbit.radius
+					);
+
+					// 应用倾斜变换
+					const tiltMatrix = new THREE.Matrix4().makeRotationX(this.orbit.tilt);
+					basePosition.applyMatrix4(tiltMatrix);
+
+					// 添加Z轴偏移
+					basePosition.z += this.orbit.level * CONFIG.orbits.zOffset;
+
+					// 设置最终位置
+					this.mesh.position.copy(basePosition);
+
+					// 使文字朝向中心
+					this.mesh.lookAt(0, 0, 0);
+					this.mesh.rotateX(Math.PI * 0.1);
+				}
+
 				if (this.gravityLine.active) {
 					this.updateGravityLine();
 				}
@@ -311,19 +335,24 @@ class Text3D {
 		const points = [];
 		const segments = 180;
 		
-		// 生成完整轨道的点
-		const center = new THREE.Vector3(0, 0, 0);
+		// 创建固定轨道
 		const tiltMatrix = new THREE.Matrix4().makeRotationX(this.orbit.tilt);
 		
 		for (let i = 0; i <= segments; i++) {
 			const angle = (i / segments) * Math.PI * 2;
-			// 先创建平面上的点
-			const x = Math.cos(angle) * this.orbit.radius;
-			const z = Math.sin(angle) * this.orbit.radius;
-			const point = new THREE.Vector3(x, 0, z);
-			// 使用矩阵变换应用倾斜，确保精确性
-			point.applyMatrix4(tiltMatrix);
-			points.push(point);
+			const basePoint = new THREE.Vector3(
+				Math.cos(angle) * this.orbit.radius,
+				0,
+				Math.sin(angle) * this.orbit.radius
+			);
+			
+			// 应用倾斜
+			basePoint.applyMatrix4(tiltMatrix);
+			
+			// 添加Z轴偏移
+			basePoint.z += this.orbit.level * CONFIG.orbits.zOffset;
+			
+			points.push(basePoint);
 		}
 
 		const geometry = new THREE.BufferGeometry().setFromPoints(points);

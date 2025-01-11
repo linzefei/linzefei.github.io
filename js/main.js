@@ -211,12 +211,14 @@ function init() {
         // 添加速度控制
         const speedSlider = document.getElementById('speed-slider');
         const speedValue = document.getElementById('speed-value');
-        const savedSpeed = localStorage.getItem('rotationSpeed');
+        const savedSpeed = localStorage.getItem('rotationSpeed') || '1.0';
         
-        if (savedSpeed) {
-            speedSlider.value = savedSpeed;
-            speedValue.textContent = savedSpeed;
-        }
+        // 设置滑块和显示值
+        speedSlider.value = savedSpeed;
+        speedValue.textContent = savedSpeed;
+
+        // 在创建文字时应用保存的速度
+        window.initialSpeed = parseFloat(savedSpeed); // 添加全局变量存储初始速度
 
         speedSlider.addEventListener('input', (e) => {
             const speed = parseFloat(e.target.value);
@@ -257,11 +259,16 @@ function createTexts(font) {
             text3D.create(scene, font);
             text3D.createOrbitLine(scene);
             
+            // 应用保存的速度
+            if (window.initialSpeed) {
+                text3D.setRotationSpeed(window.initialSpeed);
+            }
+            
             if (text3D.orbitLine) {
                 text3D.orbitLine.showFullTrail = savedTrailMode;
                 text3D.orbitLine.visible = index < savedVisibleOrbits;
             }
-            text3D.visible = index < savedVisibleOrbits; // 应用保存的可见性状态
+            text3D.visible = index < savedVisibleOrbits;
             
             texts.push(text3D);
             previousText = text3D;
