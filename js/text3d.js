@@ -51,9 +51,9 @@ class Text3D {
 		// 添加轨道线相关属性
 		this.orbitLine = {
 			line: null,
-			segments: 32,     // 轨道线段数
-			visibleArc: 0.2,  // 可见弧长比例 (0-1)
-			material: null
+			segments: 128,
+			colors: null,
+			showFullTrail: false  // 新增：是否显示完整轨迹
 		};
 	}
 
@@ -135,8 +135,8 @@ class Text3D {
 					
 					// 根据速度调整轨迹长度
 					const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
-					const pastArc = Math.PI * (0.2 + speedFactor * 0.1);   // 速度越快，轨迹越长
-					const futureArc = Math.PI * (0.3 + speedFactor * 0.1);  // 速度越快，预示轨迹越长
+					const pastArc = Math.PI * (0.2 + speedFactor * 0.1);
+					const futureArc = Math.PI * (0.3 + speedFactor * 0.1);
 					
 					// 更新每个点的颜色
 					for (let i = 0; i <= segments; i++) {
@@ -149,17 +149,24 @@ class Text3D {
 						const colorIndex = i * 3;
 						const color = new THREE.Color(this.params.color);
 						
-						let opacity = 0;
-						
-						if (deltaAngle < 0 && deltaAngle > -pastArc) {
-							// 过去的轨迹，使用平滑的余弦过渡
-							opacity = Math.cos(deltaAngle * Math.PI / (2 * pastArc)) * 0.6;
-						} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
-							// 未来的轨迹，使用虚线效果
-							const progress = deltaAngle / futureArc;
-							const dashPhase = (i / 2) % 1;
-							opacity = Math.cos(progress * Math.PI * 0.5) * 0.3 * 
-									 (Math.cos(dashPhase * Math.PI * 2) * 0.5 + 0.5);
+						let opacity;
+						if (this.orbitLine.showFullTrail) {
+							// 完整轨迹模式：显示整个轨道
+							opacity = 0.3;
+							if ((i % 4) < 2) { // 创建虚线效果
+								opacity *= 0.5;
+							}
+						} else {
+							// 部分轨迹模式：只显示文字前后的轨迹
+							opacity = 0;
+							if (deltaAngle < 0 && deltaAngle > -pastArc) {
+								opacity = Math.cos(deltaAngle * Math.PI / (2 * pastArc)) * 0.6;
+							} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
+								const progress = deltaAngle / futureArc;
+								const dashPhase = (i / 2) % 1;
+								opacity = Math.cos(progress * Math.PI * 0.5) * 0.3 * 
+										 (Math.cos(dashPhase * Math.PI * 2) * 0.5 + 0.5);
+							}
 						}
 						
 						colors[colorIndex] = color.r * opacity;

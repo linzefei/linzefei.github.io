@@ -75,6 +75,17 @@ function init() {
             modeLabel.textContent = `当前模式：${isOrbitMode ? '场景旋转' : '文字引力'}`;
         });
 
+        // 添加轨迹模式切换按钮的事件监听
+        const trailSwitch = document.getElementById('trail-switch');
+        trailSwitch.addEventListener('click', () => {
+            // 切换所有文字的轨迹显示模式
+            texts.forEach(text => {
+                text.orbitLine.showFullTrail = !text.orbitLine.showFullTrail;
+            });
+            // 更新按钮文本
+            trailSwitch.textContent = `轨迹模式：${texts[0]?.orbitLine.showFullTrail ? '完整' : '部分'}`;
+        });
+
         // 添加鼠标/触摸事件监听器
         renderer.domElement.addEventListener('pointerdown', onPointerDown);
         renderer.domElement.addEventListener('pointermove', onPointerMove);
