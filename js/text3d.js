@@ -147,19 +147,18 @@ class Text3D {
 						
 						// 计算透明度
 						let opacity = 0;
-						const pastArc = Math.PI * 0.2;   // 过去轨迹长度
-						const futureArc = Math.PI * 0.3;  // 未来轨迹长度
+						const pastArc = Math.PI * 0.3;   // 增加过去轨迹长度
+						const futureArc = Math.PI * 0.4;  // 增加未来轨迹长度
 						
 						if (deltaAngle < 0 && deltaAngle > -pastArc) {
-							// 过去的轨迹，渐变消失
-							opacity = 0.8 * (1 + deltaAngle / pastArc);
+							// 过去的轨迹，使用平滑的余弦过渡
+							opacity = Math.cos(deltaAngle * Math.PI / (2 * pastArc)) * 0.6;
 						} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
 							// 未来的轨迹，使用虚线效果
-							opacity = 0.4 * (1 - deltaAngle / futureArc);
-							// 添加虚线效果
-							if ((i % 4) < 2) { // 每4个点中的2个点可见
-								opacity *= 0.5;
-							}
+							const progress = deltaAngle / futureArc;
+							const dashPhase = (i / 2) % 1; // 创建更明显的虚线效果
+							opacity = Math.cos(progress * Math.PI * 0.5) * 0.3 * 
+									 (Math.cos(dashPhase * Math.PI * 2) * 0.5 + 0.5);
 						}
 						
 						colors[colorIndex] = color.r * opacity;
@@ -291,7 +290,7 @@ class Text3D {
 	createOrbitLine(scene) {
 		// 创建完整轨道
 		const points = [];
-		const segments = 64; // 增加分段数使轨道更平滑
+		const segments = 128; // 增加分段数，使轨迹更平滑
 		
 		// 生成完整轨道的点
 		for (let i = 0; i <= segments; i++) {
@@ -313,7 +312,8 @@ class Text3D {
 		const material = new THREE.LineBasicMaterial({
 			vertexColors: true,
 			transparent: true,
-			depthWrite: false
+			depthWrite: false,
+			opacity: 1
 		});
 
 		const line = new THREE.Line(geometry, material);
