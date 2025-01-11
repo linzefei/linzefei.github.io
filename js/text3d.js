@@ -54,8 +54,12 @@ class Text3D {
 			line: null,
 			segments: 128,
 			colors: null,
-			showFullTrail: false  // 新增：是否显示完整轨迹
+			showFullTrail: false,
+			visible: false  // 添加可见性控制
 		};
+		
+		// 添加整体可见性控制
+		this.visible = false;
 	}
 
 	create(scene, font) {
@@ -87,110 +91,124 @@ class Text3D {
 		if (!this.mesh) return;
 
 		try {
-			if (this.gravityLine.active) {
-				this.updateGravityLine();
+			// 控制文字和轨道线的可见性
+			this.mesh.visible = this.visible;
+			if (this.orbitLine.line) {
+				this.orbitLine.line.visible = this.visible && this.orbitLine.visible;
 			}
 
-			if (this.attraction.active) {
-				// 计算引力效果
-				const direction = new THREE.Vector3().subVectors(this.attraction.target, this.mesh.position);
-				const distance = direction.length();
-				
-				if (distance > 1) {
-					direction.normalize();
-					// 添加原有轨道运动的影响
-					const orbitForce = this.calculateOrbitForce();
-					this.mesh.position.add(direction.multiplyScalar(this.gravityLine.strength * distance));
-					this.mesh.position.add(orbitForce.multiplyScalar(0.3));
+			// 只有在可见时才更新位置和轨迹
+			if (this.visible) {
+				if (this.gravityLine.active) {
+					this.updateGravityLine();
 				}
-				
-				if (this.orbitLine.line) {
-					this.orbitLine.line.visible = false;
-				}
-			} else {
-				// 正常轨道运动
-				this.orbit.angle += this.orbit.speed * 0.01;
-				
-				// 计算基础轨道位置
-				const position = new THREE.Vector3(
-					Math.cos(this.orbit.angle) * this.orbit.radius,
-					0,
-					Math.sin(this.orbit.angle) * this.orbit.radius
-				);
-				
-				// 应用倾斜
-				position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
-				
-				// 添加中心点偏移和Z轴偏移
-				const targetPosition = new THREE.Vector3()
-					.copy(this.orbit.center)
-					.add(position);
-				targetPosition.z += this.orbit.level * CONFIG.orbits.zOffset;
-				
-				// 更新文字位置
-				const moveSpeed = Math.min(0.1, this.orbit.speed * 0.05);
-				this.mesh.position.lerp(targetPosition, moveSpeed);
 
-				// 更新轨道线
-				if (this.orbitLine.line) {
-					const colors = this.orbitLine.colors;
-					const segments = this.orbitLine.segments;
+				if (this.attraction.active) {
+					// 计算引力效果
+					const direction = new THREE.Vector3().subVectors(this.attraction.target, this.mesh.position);
+					const distance = direction.length();
 					
-					// 计算实际角度 - 移除Z轴偏移后计算
-					const actualPosition = this.mesh.position.clone().sub(this.orbit.center);
-					actualPosition.z -= this.orbit.level * CONFIG.orbits.zOffset;
-					const currentAngle = Math.atan2(actualPosition.z, actualPosition.x);
-					
-					// 根据速度调整轨迹长度
-					const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
-					const pastArc = Math.PI * (0.3 + speedFactor * 0.2);
-					const futureArc = Math.PI * (0.4 + speedFactor * 0.2);
-					
-					// 更新每个点的颜色
-					for (let i = 0; i <= segments; i++) {
-						const angle = (i / segments) * Math.PI * 2;
-						
-						let deltaAngle = angle - currentAngle;
-						while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
-						while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
-						
-						const colorIndex = i * 3;
-						const color = new THREE.Color(this.params.color);
-						
-						let opacity;
-						if (this.orbitLine.showFullTrail) {
-							opacity = 0.2;
-							if ((i % 6) < 3) {
-								opacity *= 0.7;
-							}
-						} else {
-							opacity = 0;
-							if (deltaAngle < 0 && deltaAngle > -pastArc) {
-								const t = -deltaAngle / pastArc;
-								opacity = Math.cos(t * Math.PI * 0.5) * 0.5;
-							} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
-								const t = deltaAngle / futureArc;
-								opacity = (1 - t) * 0.3;
-								if ((i % 4) < 2) {
-									opacity *= 0.5;
-								}
-							}
-						}
-						
-						colors[colorIndex] = color.r * opacity;
-						colors[colorIndex + 1] = color.g * opacity;
-						colors[colorIndex + 2] = color.b * opacity;
+					if (distance > 1) {
+						direction.normalize();
+						// 添加原有轨道运动的影响
+						const orbitForce = this.calculateOrbitForce();
+						this.mesh.position.add(direction.multiplyScalar(this.gravityLine.strength * distance));
+						this.mesh.position.add(orbitForce.multiplyScalar(0.3));
 					}
 					
-					this.orbitLine.line.geometry.attributes.color.needsUpdate = true;
-					this.orbitLine.line.visible = true;
-				}
-			}
+					if (this.orbitLine.line) {
+						this.orbitLine.line.visible = false;
+					}
+				} else {
+					// 正常轨道运动
+					this.orbit.angle += this.orbit.speed * 0.01;
+					
+					// 计算基础轨道位置
+					const position = new THREE.Vector3(
+						Math.cos(this.orbit.angle) * this.orbit.radius,
+						0,
+						Math.sin(this.orbit.angle) * this.orbit.radius
+					);
+					
+					// 应用倾斜
+					position.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.orbit.tilt);
+					
+					// 添加中心点偏移和Z轴偏移
+					const targetPosition = new THREE.Vector3()
+						.copy(this.orbit.center)
+						.add(position);
+					targetPosition.z += this.orbit.level * CONFIG.orbits.zOffset;
+					
+					// 更新文字位置
+					const moveSpeed = Math.min(0.1, this.orbit.speed * 0.05);
+					this.mesh.position.lerp(targetPosition, moveSpeed);
 
-			// 使文字朝向轨道中心
-			this.mesh.lookAt(this.orbit.center);
-			this.mesh.rotateX(Math.PI * 0.1);
-			
+					// 更新轨道线
+					if (this.orbitLine.line) {
+						// 根据可见性控制显示
+						this.orbitLine.line.visible = this.orbitLine.visible;
+						
+						if (this.orbitLine.visible) {
+							// 只有在轨道可见时才更新颜色
+							const colors = this.orbitLine.colors;
+							const segments = this.orbitLine.segments;
+							
+							// 计算实际角度 - 移除Z轴偏移后计算
+							const actualPosition = this.mesh.position.clone().sub(this.orbit.center);
+							actualPosition.z -= this.orbit.level * CONFIG.orbits.zOffset;
+							const currentAngle = Math.atan2(actualPosition.z, actualPosition.x);
+							
+							// 根据速度调整轨迹长度
+							const speedFactor = this.orbit.speed / CONFIG.orbits.rotationSpeed.max;
+							const pastArc = Math.PI * (0.3 + speedFactor * 0.2);
+							const futureArc = Math.PI * (0.4 + speedFactor * 0.2);
+							
+							// 更新每个点的颜色
+							for (let i = 0; i <= segments; i++) {
+								const angle = (i / segments) * Math.PI * 2;
+								
+								let deltaAngle = angle - currentAngle;
+								while (deltaAngle > Math.PI) deltaAngle -= Math.PI * 2;
+								while (deltaAngle < -Math.PI) deltaAngle += Math.PI * 2;
+								
+								const colorIndex = i * 3;
+								const color = new THREE.Color(this.params.color);
+								
+								let opacity;
+								if (this.orbitLine.showFullTrail) {
+									opacity = 0.2;
+									if ((i % 6) < 3) {
+										opacity *= 0.7;
+									}
+								} else {
+									opacity = 0;
+									if (deltaAngle < 0 && deltaAngle > -pastArc) {
+										const t = -deltaAngle / pastArc;
+										opacity = Math.cos(t * Math.PI * 0.5) * 0.5;
+									} else if (deltaAngle >= 0 && deltaAngle < futureArc) {
+										const t = deltaAngle / futureArc;
+										opacity = (1 - t) * 0.3;
+										if ((i % 4) < 2) {
+											opacity *= 0.5;
+										}
+									}
+								}
+								
+								colors[colorIndex] = color.r * opacity;
+								colors[colorIndex + 1] = color.g * opacity;
+								colors[colorIndex + 2] = color.b * opacity;
+							}
+							
+							this.orbitLine.line.geometry.attributes.color.needsUpdate = true;
+						}
+					}
+				}
+
+				// 使文字朝向轨道中心
+				this.mesh.lookAt(this.orbit.center);
+				this.mesh.rotateX(Math.PI * 0.1);
+				
+			}
 		} catch (error) {
 			console.error('Error in update:', error);
 			this.releaseGravityLine();

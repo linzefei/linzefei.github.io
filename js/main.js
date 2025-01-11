@@ -12,6 +12,7 @@ let isDragging = false;
 let selectedText = null;
 let mouse = new THREE.Vector2();
 let raycaster = new THREE.Raycaster();
+let visibleOrbits = 1; // 当前显示的轨道数量
 
 function init() {
     try {
@@ -65,22 +66,29 @@ function init() {
         controls.maxDistance = 1500;
         controls.maxPolarAngle = Math.PI;
 
-        // 从本地存储加载上次的状态
+        // 从本地存储加载所有状态
         const savedOrbitMode = localStorage.getItem('orbitMode');
         const savedTrailMode = localStorage.getItem('trailMode');
+        const savedVisibleOrbits = localStorage.getItem('visibleOrbits');
         
+        // 设置初始状态
         isOrbitMode = savedOrbitMode ? savedOrbitMode === 'true' : true;
         const showFullTrail = savedTrailMode ? savedTrailMode === 'true' : false;
+        visibleOrbits = savedVisibleOrbits ? parseInt(savedVisibleOrbits) : 1;
         
         // 添加模式切换按钮的事件监听
         const modeSwitch = document.getElementById('mode-switch');
         const trailSwitch = document.getElementById('trail-switch');
+        const orbitDebug = document.getElementById('orbit-debug');
+        const orbitCount = document.getElementById('orbit-count');
         
-        // 初始化按钮状态
+        // 初始化所有按钮状态
         updateModeButton(modeSwitch, isOrbitMode);
         updateTrailButton(trailSwitch, showFullTrail);
+        orbitCount.textContent = visibleOrbits;
         controls.enabled = isOrbitMode;
 
+        // 模式切换按钮事件
         modeSwitch.addEventListener('click', () => {
             isOrbitMode = !isOrbitMode;
             updateModeButton(modeSwitch, isOrbitMode);
@@ -88,9 +96,8 @@ function init() {
             localStorage.setItem('orbitMode', isOrbitMode);
         });
 
-        // 添加轨迹模式切换按钮的事件监听
+        // 轨迹模式切换按钮事件
         trailSwitch.addEventListener('click', () => {
-            // 安全地获取当前状态
             const currentState = texts.length > 0 ? texts[0].orbitLine.showFullTrail : false;
             const newState = !currentState;
             
@@ -102,6 +109,30 @@ function init() {
             
             updateTrailButton(trailSwitch, newState);
             localStorage.setItem('trailMode', newState);
+        });
+
+        // 轨道调试按钮事件
+        orbitDebug.addEventListener('click', () => {
+            visibleOrbits = (visibleOrbits % texts.length) + 1;
+            
+            texts.forEach((text, index) => {
+                if (text) {
+                    if (visibleOrbits === 1) {
+                        text.visible = index === 0;
+                        if (text.orbitLine) {
+                            text.orbitLine.visible = index === 0;
+                        }
+                    } else {
+                        text.visible = index < visibleOrbits;
+                        if (text.orbitLine) {
+                            text.orbitLine.visible = index < visibleOrbits;
+                        }
+                    }
+                }
+            });
+            
+            orbitCount.textContent = visibleOrbits;
+            localStorage.setItem('visibleOrbits', visibleOrbits);
         });
 
         // 添加鼠标/触摸事件监听器
@@ -186,6 +217,7 @@ function createTexts(font) {
         let previousText = null;
         const items = TextData.getNextPage();
         const savedTrailMode = localStorage.getItem('trailMode') === 'true';
+        const savedVisibleOrbits = parseInt(localStorage.getItem('visibleOrbits')) || 1;
         
         items.forEach((item, index) => {
             const radius = CONFIG.orbits.baseRadius + 
@@ -205,7 +237,9 @@ function createTexts(font) {
             
             if (text3D.orbitLine) {
                 text3D.orbitLine.showFullTrail = savedTrailMode;
+                text3D.orbitLine.visible = index < savedVisibleOrbits;
             }
+            text3D.visible = index < savedVisibleOrbits; // 应用保存的可见性状态
             
             texts.push(text3D);
             previousText = text3D;
