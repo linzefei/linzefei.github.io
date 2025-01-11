@@ -22,7 +22,16 @@ function init() {
 
         // 创建相机
         camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
-        camera.position.set(0, 100, 800);
+        
+        // 从本地存储加载相机位置和旋转
+        const savedCamera = JSON.parse(localStorage.getItem('cameraState'));
+        if (savedCamera) {
+            camera.position.set(savedCamera.position.x, savedCamera.position.y, savedCamera.position.z);
+            camera.rotation.set(savedCamera.rotation.x, savedCamera.rotation.y, savedCamera.rotation.z);
+        } else {
+            // 使用默认位置
+            camera.position.set(0, 100, 800);
+        }
         camera.lookAt(0, 0, 0);
 
         // 创建渲染器
@@ -59,12 +68,18 @@ function init() {
 
         // 添加相机控制
         controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true; // 添加阻尼效果
+        controls.enableDamping = true;
         controls.dampingFactor = 0.05;
         controls.screenSpacePanning = false;
         controls.minDistance = 100;
         controls.maxDistance = 1500;
         controls.maxPolarAngle = Math.PI;
+
+        // 从本地存储加载控制器状态
+        const savedControls = JSON.parse(localStorage.getItem('controlsState'));
+        if (savedControls) {
+            controls.target.set(savedControls.target.x, savedControls.target.y, savedControls.target.z);
+        }
 
         // 从本地存储加载所有状态
         const savedOrbitMode = localStorage.getItem('orbitMode');
@@ -308,6 +323,31 @@ window.addEventListener('load', function() {
 
 // 添加清理函数
 function cleanup() {
+    // 保存相机状态
+    const cameraState = {
+        position: {
+            x: camera.position.x,
+            y: camera.position.y,
+            z: camera.position.z
+        },
+        rotation: {
+            x: camera.rotation.x,
+            y: camera.rotation.y,
+            z: camera.rotation.z
+        }
+    };
+    localStorage.setItem('cameraState', JSON.stringify(cameraState));
+
+    // 保存控制器状态
+    const controlsState = {
+        target: {
+            x: controls.target.x,
+            y: controls.target.y,
+            z: controls.target.z
+        }
+    };
+    localStorage.setItem('controlsState', JSON.stringify(controlsState));
+
     texts.forEach(text => {
         if (text && text.gravityLine && text.gravityLine.active) {
             text.releaseGravityLine();
@@ -332,3 +372,34 @@ function updateTrailButton(button, isFullTrail) {
     button.textContent = `轨迹显示：${isFullTrail ? '完整' : '部分'}`;
     button.classList.toggle('active', isFullTrail);
 }
+
+// 添加定期保存状态的功能，防止意外关闭
+function autoSaveState() {
+    if (camera && controls) {
+        const cameraState = {
+            position: {
+                x: camera.position.x,
+                y: camera.position.y,
+                z: camera.position.z
+            },
+            rotation: {
+                x: camera.rotation.x,
+                y: camera.rotation.y,
+                z: camera.rotation.z
+            }
+        };
+        localStorage.setItem('cameraState', JSON.stringify(cameraState));
+
+        const controlsState = {
+            target: {
+                x: controls.target.x,
+                y: controls.target.y,
+                z: controls.target.z
+            }
+        };
+        localStorage.setItem('controlsState', JSON.stringify(controlsState));
+    }
+}
+
+// 每5秒自动保存一次状态
+setInterval(autoSaveState, 5000);
