@@ -192,15 +192,15 @@ class Text3D {
 							
 							let opacity;
 							if (this.orbitLine.showFullTrail) {
-								opacity = 0.2;
-								if ((i % 6) < 3) opacity *= 0.7;
+								opacity = 0.4;
+								if ((i % 6) < 3) opacity *= 0.8;
 							} else {
 								opacity = 0;
-								if (deltaAngle < 0 && deltaAngle > -Math.PI * 0.3) {
-									opacity = Math.cos(deltaAngle * 1.5) * 0.5;
-								} else if (deltaAngle >= 0 && deltaAngle < Math.PI * 0.4) {
-									opacity = (1 - deltaAngle / (Math.PI * 0.4)) * 0.3;
-									if ((i % 4) < 2) opacity *= 0.5;
+								if (deltaAngle < 0 && deltaAngle > -Math.PI * 0.5) {
+									opacity = Math.cos(deltaAngle * 1.2) * 0.8;
+								} else if (deltaAngle >= 0 && deltaAngle < Math.PI * 0.3) {
+									opacity = (1 - deltaAngle / (Math.PI * 0.3)) * 0.6;
+									if ((i % 4) < 2) opacity *= 0.7;
 								}
 							}
 							
@@ -346,12 +346,8 @@ class Text3D {
 				Math.sin(angle) * this.orbit.radius
 			);
 			
-			// 应用倾斜
 			basePoint.applyMatrix4(tiltMatrix);
-			
-			// 添加Z轴偏移
 			basePoint.z += this.orbit.level * CONFIG.orbits.zOffset;
-			
 			points.push(basePoint);
 		}
 
@@ -359,17 +355,19 @@ class Text3D {
 		const colors = new Float32Array(points.length * 3);
 		geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 		
+		// 修改材质设置
 		const material = new THREE.LineBasicMaterial({
 			vertexColors: true,
 			transparent: true,
 			depthWrite: false,
-			opacity: 1
+			opacity: 1,
+			linewidth: 2, // 增加线条宽度（注意：在WebGL中可能不起作用）
+			blending: THREE.AdditiveBlending // 添加混合模式，使轨迹更明显
 		});
 
 		const line = new THREE.Line(geometry, material);
 		line.renderOrder = 1000 - this.orbit.level;
 		
-		// 设置轨道线的位置
 		line.position.copy(this.orbit.center);
 		line.position.z += this.orbit.level * CONFIG.orbits.zOffset;
 		
