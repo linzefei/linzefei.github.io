@@ -20,6 +20,11 @@ let elements;
 // 将 updateOrbitDisplay 移到全局作用域
 function updateOrbitDisplay() {
     try {
+        // 确保 visibleOrbits 有效
+        if (!visibleOrbits || visibleOrbits < 1) {
+            visibleOrbits = 1;
+        }
+        
         texts.forEach((text, index) => {
             if (text) {
                 text.visible = index < visibleOrbits;
@@ -28,10 +33,13 @@ function updateOrbitDisplay() {
                 }
             }
         });
+        
+        // 更新UI显示
         if (elements) {
             elements.orbitCount.textContent = visibleOrbits;
-            elements.totalOrbits.textContent = TextData.getCount() || texts.length;
+            elements.totalOrbits.textContent = TextData.getCount();
         }
+        
         localStorage.setItem('visibleOrbits', visibleOrbits);
     } catch (error) {
         console.error('Error in updateOrbitDisplay:', error);
@@ -112,19 +120,20 @@ function init() {
         const savedSpeed = localStorage.getItem('rotationSpeed');
         const savedAdvancedVisible = localStorage.getItem('advancedVisible');
 
-        // 设置默认值
+        // 修改默认设置，visibleOrbits 默认为 null（表示新用户）
         const defaultSettings = {
             orbitMode: true,          // 默认：旋转镜头
             trailMode: false,         // 默认：部分轨迹
-            visibleOrbits: null,      // 默认：等待文字加载后设置
+            visibleOrbits: null,      // null 表示新用户，将显示全部轨道
             speed: 1.0,               // 默认：速度1.0
             advancedVisible: false    // 默认：高级选项隐藏
         };
 
-        // 应用设置，优先使用保存的值，否则使用默认值
+        // 应用设置，对于新用户显示全部轨道
         isOrbitMode = savedOrbitMode !== null ? savedOrbitMode === 'true' : defaultSettings.orbitMode;
         const showFullTrail = savedTrailMode !== null ? savedTrailMode === 'true' : defaultSettings.trailMode;
-        visibleOrbits = savedVisibleOrbits ? parseInt(savedVisibleOrbits) : 1;
+        // 如果是新用户（savedVisibleOrbits 为 null），则使用 TextData.getCount()
+        visibleOrbits = savedVisibleOrbits ? parseInt(savedVisibleOrbits) : TextData.getCount();
         window.initialSpeed = parseFloat(savedSpeed || defaultSettings.speed);
         const showAdvanced = savedAdvancedVisible === 'true';
 
@@ -180,14 +189,15 @@ function init() {
 
         // 添加显示全部轨道按钮事件
         elements.showAllOrbits.addEventListener('click', () => {
-            visibleOrbits = texts.length;
+            visibleOrbits = TextData.getCount();
             updateOrbitDisplay();
         });
 
         // 添加轨道切换按钮事件
         elements.orbitDebug.addEventListener('click', () => {
+            const maxOrbits = TextData.getCount();
             // 如果当前显示的是最后一个数量，则回到1，否则加1
-            if (visibleOrbits >= texts.length) {
+            if (visibleOrbits >= maxOrbits) {
                 visibleOrbits = 1;
             } else {
                 visibleOrbits++;
@@ -209,7 +219,13 @@ function init() {
 
         // 如果是新用户，保存默认设置
         if (savedOrbitMode === null) {
-            saveSettings(defaultSettings);
+            saveSettings({
+                orbitMode: defaultSettings.orbitMode,
+                trailMode: defaultSettings.trailMode,
+                visibleOrbits: TextData.getCount(), // 保存全部轨道数
+                speed: defaultSettings.speed,
+                advancedVisible: defaultSettings.advancedVisible
+            });
         }
 
         // 添加模式切换按钮的事件监听
@@ -312,22 +328,16 @@ function createTexts(font) {
         const items = TextData.getNextPage();
         const savedTrailMode = localStorage.getItem('trailMode');
         const showFullTrail = savedTrailMode !== null ? savedTrailMode === 'true' : false;
-        const savedVisibleOrbits = localStorage.getItem('visibleOrbits');
         
-        // 更新总轨道数显示
-        const totalOrbits = document.getElementById('total-orbits');
-        if (totalOrbits) {
-            totalOrbits.textContent = TextData.getCount();
+        // 确保 visibleOrbits 有有效值
+        if (!visibleOrbits || visibleOrbits < 1) {
+            visibleOrbits = 1;
         }
         
-        // 如果是第一批文字且没有保存的设置，设置为显示所有轨道
-        if (!savedVisibleOrbits && texts.length === 0) {
-            visibleOrbits = items.length;
-            saveSettings({ visibleOrbits: visibleOrbits });
-            const orbitCount = document.getElementById('orbit-count');
-            if (orbitCount) {
-                orbitCount.textContent = visibleOrbits;
-            }
+        // 更新UI显示
+        if (elements && elements.totalOrbits) {
+            elements.totalOrbits.textContent = TextData.getCount();
+            elements.orbitCount.textContent = visibleOrbits;
         }
 
         items.forEach((item, index) => {
@@ -368,8 +378,8 @@ function createTexts(font) {
             }, 2000);
         } else {
             // 所有文字加载完成后，再次更新总轨道数
-            if (totalOrbits) {
-                totalOrbits.textContent = texts.length;
+            if (elements && elements.totalOrbits) {
+                elements.totalOrbits.textContent = texts.length;
             }
         }
     } catch (error) {
@@ -527,8 +537,8 @@ function resetToDefaults() {
             text.setRotationSpeed(speed);
         });
         
-        // 重置轨道显示
-        visibleOrbits = texts.length;
+        // 重置轨道显示为全部轨道
+        visibleOrbits = TextData.getCount();
         texts.forEach((text, index) => {
             text.visible = true;
             if (text.orbitLine) {
@@ -551,11 +561,11 @@ function resetToDefaults() {
         isDragging = false;
         selectedText = null;
         
-        // 保存默认设置
+        // 保存默认设置（与新用户设置相同）
         saveSettings({
             orbitMode: true,
             trailMode: false,
-            visibleOrbits: texts.length,
+            visibleOrbits: TextData.getCount(), // 使用总轨道数
             speed: 1.0,
             advancedVisible: false
         });

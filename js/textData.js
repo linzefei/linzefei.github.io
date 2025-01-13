@@ -144,7 +144,7 @@ class TextDataManager {
 
     // 获取当前总数
     getCount() {
-        return this.items.length;
+        return this.displayOrder.length;
     }
 
     // 设置每页加载数量
