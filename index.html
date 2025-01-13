@@ -88,6 +88,16 @@
 			font-family: Arial, sans-serif;
 			font-size: 14px;
 			user-select: none;
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+		#logo .version {
+			color: rgba(255, 255, 255, 0.4);
+			font-size: 12px;
+			padding: 2px 6px;
+			border: 1px solid rgba(255, 255, 255, 0.2);
+			border-radius: 3px;
 		}
 		#logo a {
 			color: #4CAF50;
@@ -135,6 +145,7 @@
 		<button id="mode-switch" class="control-button">操作模式：旋转镜头</button>
 	</div>
 	<div id="logo">
+		<span class="version">v0.1.1</span>
 		Powered by <a href="https://cursor.sh" target="_blank">Cursor</a>
 	</div>
 	<div id="debug-controls">
