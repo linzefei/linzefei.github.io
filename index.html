@@ -109,5 +109,39 @@
         if (h) h.style.opacity = '0';
     }, 6000);
     </script>
+
+    <!-- Visit tracking (Supabase) -->
+    <script>
+    (function() {
+        const SB_URL  = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
+        const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
+
+        // Generate or retrieve a persistent visitor ID
+        let vid = localStorage.getItem('_vid');
+        if (!vid) {
+            vid = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+            localStorage.setItem('_vid', vid);
+        }
+
+        const today = new Date().toISOString().slice(0, 10);
+
+        fetch(SB_URL + '/rest/v1/page_visits', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SB_ANON,
+                'Authorization': 'Bearer ' + SB_ANON,
+                'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({
+                visitor_id: vid,
+                date:       today,
+                referrer:   document.referrer || null,
+                user_agent: navigator.userAgent,
+                page:       location.pathname
+            })
+        }).catch(() => {}); // silent fail, never block the page
+    })();
+    </script>
 </body>
 </html>
