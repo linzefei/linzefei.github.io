@@ -1,24 +1,29 @@
-// 场景配置
-const CONFIG = {
-	// 文字样式
-	textSize: 30,
-	textHeight: 5,
-
-	// 轨道配置
-	orbits: {
-		baseRadius: 100,      // 基础轨道半径
-		radiusIncrement: 100, // 增加轨道间距，避免碰撞
-		rotationSpeed: {
-			min: 0.2,
-			max: 0.8          // 降低最大速度，使运动更平稳
-		},
-		tilt: 0.15,          // 增加倾斜角度，使轨道层次更分明
-		zOffset: 1.0         // 增加Z轴偏移，加强层次感
-	},
-
-	// 场景边界
-	bounds: {
-		min: -1000,
-		max: 1000
-	}
+// Galaxy Configuration
+const GALAXY_CONFIG = {
+    particles: {
+        disk:       55000,   // Main spiral disk
+        core:       18000,   // Dense central bulge
+        halo:        4000,   // Stellar halo (spherical)
+        nebula:      6000,   // Nebula cloud patches
+        background: 12000,   // Distant background stars
+    },
+    arms: {
+        count:         4,    // Number of spiral arms
+        windingFactor: 1.0,  // How tightly wound (higher = more turns)
+        spread:        0.40, // Angular scatter around each arm
+    },
+    size: {
+        diskRadius: 560,     // Outer edge of disk (units)
+        coreRadius:  55,     // Core/bulge radius
+        haloRadius: 900,     // Outer edge of halo
+    },
+    rotation: {
+        disk:  0.000095,     // Galaxy rotation speed (rad/frame)
+    },
+    camera: {
+        fov:  60,
+        near: 0.1,
+        far:  8000,
+        position: { x: 0, y: 520, z: 980 },
+    },
 };
