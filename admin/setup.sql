@@ -65,7 +65,7 @@ create table if not exists visitor_words (
   created_at  timestamptz default now(),
   word        text        not null check (char_length(word) between 1 and 20),
   visitor_id  text,
-  approved    boolean     default true,   -- 管理员可下架
+  approved    boolean     default false,  -- 需要管理员审批后才公开
   source      text        default 'visitor',  -- 'default' | 'visitor'
   sort_order  int         default 999     -- 默认词按此排序，游客词按时间
 );

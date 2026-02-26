@@ -245,15 +245,12 @@
                 body: JSON.stringify({ word, visitor_id: vid, source: 'visitor' })
             });
             if (res.ok) {
-                wordMsg.textContent = '✦ entering the galaxy...';
+                wordMsg.textContent = '✦ submitted · pending review';
                 wordInput.value = '';
-                // 立刻插入队列最前面
-                wordQueue.unshift(word);
-                updateWordCount();
                 setTimeout(() => {
                     wordMsg.textContent = '';
                     wordPanel.classList.remove('open');
-                }, 1800);
+                }, 2200);
             } else {
                 wordMsg.textContent = 'failed – try again';
             }
