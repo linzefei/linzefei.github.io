@@ -39,16 +39,28 @@ class SupabaseClient {
     }
 
     /* Auth */
-    async signIn(email, password) {
-        const res = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
-            method: 'POST',
-            headers: this._headers(),
-            body: JSON.stringify({ email, password })
+    /* GitHub OAuth：跳转到 GitHub 授权页 */
+    signInWithGitHub() {
+        const redirectTo = encodeURIComponent(location.origin + '/admin/index.html');
+        location.href = `${this.url}/auth/v1/authorize?provider=github&redirect_to=${redirectTo}`;
+    }
+
+    /* OAuth 回调：从 URL hash 解析 token */
+    handleOAuthCallback() {
+        const hash = location.hash.slice(1);
+        if (!hash) return false;
+        const p = new URLSearchParams(hash);
+        const accessToken  = p.get('access_token');
+        const refreshToken = p.get('refresh_token');
+        const expiresIn    = parseInt(p.get('expires_in') || '3600');
+        if (!accessToken) return false;
+        this._saveSession({
+            access_token:  accessToken,
+            refresh_token: refreshToken,
+            expires_at:    Math.floor(Date.now() / 1000) + expiresIn
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed');
-        this._saveSession(data);
-        return data;
+        history.replaceState(null, '', location.pathname); // 清掉 hash
+        return true;
     }
 
     async signOut() {
