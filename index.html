@@ -245,18 +245,35 @@
                 body: JSON.stringify({ word, visitor_id: vid, source: 'visitor' })
             });
             if (res.ok) {
-                wordMsg.textContent = '✦ submitted · pending review';
+                wordMsg.textContent = '✦ entering your galaxy...';
                 wordInput.value = '';
+                // 本人立刻看到：加入队列 + 存入 localStorage
+                saveMyWord(word);
+                wordQueue.unshift(word);
+                updateWordCount();
                 setTimeout(() => {
                     wordMsg.textContent = '';
                     wordPanel.classList.remove('open');
-                }, 2200);
+                }, 2000);
             } else {
                 wordMsg.textContent = 'failed – try again';
             }
         } catch { wordMsg.textContent = 'network error'; }
         wordSub.disabled = false;
     });
+
+    /* ─── 本人提交词持久化（localStorage）────────────────────────────────── */
+    const MY_WORDS_KEY = '_my_words';
+    function saveMyWord(word) {
+        const list = getMyWords();
+        if (!list.includes(word)) {
+            list.unshift(word);
+            localStorage.setItem(MY_WORDS_KEY, JSON.stringify(list.slice(0, 20)));
+        }
+    }
+    function getMyWords() {
+        try { return JSON.parse(localStorage.getItem(MY_WORDS_KEY) || '[]'); } catch { return []; }
+    }
 
     /* ─── 粒子文字队列系统 ───────────────────────────────────────────────── */
     let wordQueue   = [];   // 待显示单词列表
@@ -278,6 +295,7 @@
     }
 
     async function fetchWords() {
+        let dbWords = [];
         try {
             const res = await fetch(
                 SB_URL + '/rest/v1/visitor_words?select=word,sort_order&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
@@ -285,15 +303,16 @@
             );
             if (res.ok) {
                 const rows = await res.json();
-                if (rows.length > 0) {
-                    wordQueue = rows.map(r => r.word);
-                    updateWordCount();
-                    return;
-                }
+                dbWords = rows.map(r => r.word);
             }
         } catch {}
-        // 回退到内置默认词
-        wordQueue = [...DEFAULT_WORDS];
+
+        // 本人提交过的词（已审或待审都给自己看）
+        const myWords = getMyWords();
+
+        // 合并：自己的词优先排在前面，去重
+        const merged = [...new Set([...myWords, ...(dbWords.length ? dbWords : DEFAULT_WORDS)])];
+        wordQueue = merged;
         updateWordCount();
     }
 
