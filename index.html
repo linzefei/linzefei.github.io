@@ -15,7 +15,6 @@
         }
         canvas { display: block; }
 
-        /* Top-left branding */
         #logo {
             position: fixed;
             top: 22px; left: 24px;
@@ -27,7 +26,6 @@
             user-select: none;
         }
 
-        /* Bottom centre hint */
         #hint {
             position: fixed;
             bottom: 24px; left: 50%;
@@ -41,7 +39,6 @@
             transition: opacity 1s;
         }
 
-        /* Top-right stats */
         #stats {
             position: fixed;
             top: 22px; right: 22px;
@@ -53,7 +50,6 @@
             letter-spacing: 1px;
         }
 
-        /* Click ripple */
         .ripple {
             position: fixed;
             border-radius: 50%;
@@ -66,6 +62,91 @@
             0%   { transform: translate(-50%,-50%) scale(0);  opacity: 1; }
             100% { transform: translate(-50%,-50%) scale(1);  opacity: 0; width: 160px; height: 160px; }
         }
+
+        /* ── 留词按钮 ── */
+        #word-btn {
+            position: fixed;
+            bottom: 28px; right: 28px;
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            border: 1px solid rgba(140,200,255,0.45);
+            background: rgba(0,0,0,0.55);
+            color: rgba(140,200,255,0.85);
+            font-size: 20px;
+            line-height: 44px;
+            text-align: center;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+            transition: border-color .3s, color .3s, box-shadow .3s;
+            z-index: 100;
+            user-select: none;
+        }
+        #word-btn:hover {
+            border-color: rgba(140,200,255,0.9);
+            color: #fff;
+            box-shadow: 0 0 14px rgba(140,200,255,0.3);
+        }
+
+        /* ── 留词面板 ── */
+        #word-panel {
+            position: fixed;
+            bottom: 82px; right: 28px;
+            width: 256px;
+            background: rgba(4,4,16,0.85);
+            border: 1px solid rgba(140,200,255,0.22);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(14px);
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #word-panel.open { display: flex; }
+
+        #word-panel p {
+            color: rgba(255,255,255,0.38);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #word-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(140,200,255,0.28);
+            border-radius: 7px;
+            color: #fff;
+            font-size: 14px;
+            padding: 8px 12px;
+            outline: none;
+            width: 100%;
+            letter-spacing: 1px;
+        }
+        #word-input::placeholder { color: rgba(255,255,255,0.18); }
+        #word-input:focus { border-color: rgba(140,200,255,0.6); }
+
+        #word-submit {
+            background: rgba(140,200,255,0.1);
+            border: 1px solid rgba(140,200,255,0.38);
+            border-radius: 7px;
+            color: rgba(140,200,255,0.88);
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 8px 0;
+            cursor: pointer;
+            transition: background .2s, color .2s;
+        }
+        #word-submit:hover   { background: rgba(140,200,255,0.2); color: #fff; }
+        #word-submit:disabled { opacity: 0.35; cursor: default; }
+
+        #word-msg {
+            color: rgba(140,200,255,0.65);
+            font-size: 11px;
+            text-align: center;
+            min-height: 14px;
+            letter-spacing: 1px;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -75,73 +156,185 @@
     <div id="hint">drag to explore &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; click to ignite</div>
     <div id="stats">
         <div id="particle-count"></div>
+        <div id="word-count"></div>
+    </div>
+
+    <div id="word-btn" title="在银河中留下你的词">✦</div>
+    <div id="word-panel">
+        <p>Leave a word in the galaxy</p>
+        <input id="word-input" type="text" maxlength="20" placeholder="your word ..." autocomplete="off" />
+        <button id="word-submit">Send to Galaxy</button>
+        <div id="word-msg"></div>
     </div>
 
     <script src="js/config.js"></script>
     <script src="js/galaxy.js"></script>
+    <script src="js/wordParticles.js"></script>
     <script src="js/main.js"></script>
 
     <script>
-    // ── Click ripple + shooting star burst ─────────────────────────────────
+    /* ─── Supabase 常量 ──────────────────────────────────────────────────── */
+    const SB_URL  = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
+    const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
+    const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON };
+
+    /* ─── 游客 ID ────────────────────────────────────────────────────────── */
+    let vid = localStorage.getItem('_vid');
+    if (!vid) {
+        vid = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('_vid', vid);
+    }
+
+    /* ─── 访问统计 ───────────────────────────────────────────────────────── */
+    (function() {
+        fetch(SB_URL + '/rest/v1/page_visits', {
+            method: 'POST',
+            headers: { ...SB_HDR, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+            body: JSON.stringify({
+                visitor_id: vid,
+                date: new Date().toISOString().slice(0, 10),
+                referrer: document.referrer || null,
+                user_agent: navigator.userAgent,
+                page: location.pathname
+            })
+        }).catch(() => {});
+    })();
+
+    /* ─── Click ripple + shooting star ──────────────────────────────────── */
     document.addEventListener('click', function(e) {
-        // Visual ripple on screen
+        if (e.target.closest('#word-panel') || e.target.id === 'word-btn') return;
         const div = document.createElement('div');
         div.className = 'ripple';
-        div.style.left = e.clientX + 'px';
-        div.style.top  = e.clientY + 'px';
-        div.style.width  = '0px';
-        div.style.height = '0px';
+        div.style.cssText = `left:${e.clientX}px;top:${e.clientY}px;width:0;height:0`;
         document.body.appendChild(div);
         setTimeout(() => div.remove(), 950);
 
-        // Trigger 2-4 shooting stars in the galaxy if it's ready
         if (typeof galaxy !== 'undefined' && galaxy) {
-            const burst = 2 + Math.floor(Math.random() * 3);
-            for (let i = 0; i < burst; i++) {
-                setTimeout(() => galaxy._spawnShootingStar(), i * 80);
-            }
+            const n = 2 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < n; i++) setTimeout(() => galaxy._spawnShootingStar(), i * 80);
         }
     });
 
-    // Hide hint after 6 s
     setTimeout(() => {
         const h = document.getElementById('hint');
         if (h) h.style.opacity = '0';
     }, 6000);
-    </script>
 
-    <!-- Visit tracking (Supabase) -->
-    <script>
-    (function() {
-        const SB_URL  = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
-        const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
+    /* ─── 留词面板交互 ───────────────────────────────────────────────────── */
+    const wordBtn   = document.getElementById('word-btn');
+    const wordPanel = document.getElementById('word-panel');
+    const wordInput = document.getElementById('word-input');
+    const wordSub   = document.getElementById('word-submit');
+    const wordMsg   = document.getElementById('word-msg');
 
-        // Generate or retrieve a persistent visitor ID
-        let vid = localStorage.getItem('_vid');
-        if (!vid) {
-            vid = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
-            localStorage.setItem('_vid', vid);
+    wordBtn.addEventListener('click', () => {
+        wordPanel.classList.toggle('open');
+        if (wordPanel.classList.contains('open')) wordInput.focus();
+    });
+    wordInput.addEventListener('keydown', e => { if (e.key === 'Enter') wordSub.click(); });
+
+    wordSub.addEventListener('click', async () => {
+        const word = wordInput.value.trim();
+        if (!word) return;
+        wordSub.disabled = true;
+        wordMsg.textContent = 'sending...';
+        try {
+            const res = await fetch(SB_URL + '/rest/v1/visitor_words', {
+                method: 'POST',
+                headers: { ...SB_HDR, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ word, visitor_id: vid, source: 'visitor' })
+            });
+            if (res.ok) {
+                wordMsg.textContent = '✦ entering the galaxy...';
+                wordInput.value = '';
+                // 立刻插入队列最前面
+                wordQueue.unshift(word);
+                updateWordCount();
+                setTimeout(() => {
+                    wordMsg.textContent = '';
+                    wordPanel.classList.remove('open');
+                }, 1800);
+            } else {
+                wordMsg.textContent = 'failed – try again';
+            }
+        } catch { wordMsg.textContent = 'network error'; }
+        wordSub.disabled = false;
+    });
+
+    /* ─── 粒子文字队列系统 ───────────────────────────────────────────────── */
+    let wordQueue   = [];   // 待显示单词列表
+    let activeWord  = null; // 当前 WordParticles 实例
+    let queueIndex  = 0;
+    let wordScene   = null;
+    let wordCamera  = null;
+
+    // 内置默认词（兜底：数据库未配置时使用）
+    const DEFAULT_WORDS = [
+        'Hello World!', 'Three.js', 'JavaScript', 'Python',
+        'Java', 'C++', 'React', 'Vue', 'Angular', 'Node.js',
+        'linzefei', 'Cursor', '2025'
+    ];
+
+    function updateWordCount() {
+        const el = document.getElementById('word-count');
+        if (el) el.textContent = wordQueue.length + ' words';
+    }
+
+    async function fetchWords() {
+        try {
+            const res = await fetch(
+                SB_URL + '/rest/v1/visitor_words?select=word,sort_order&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
+                { headers: SB_HDR }
+            );
+            if (res.ok) {
+                const rows = await res.json();
+                if (rows.length > 0) {
+                    wordQueue = rows.map(r => r.word);
+                    updateWordCount();
+                    return;
+                }
+            }
+        } catch {}
+        // 回退到内置默认词
+        wordQueue = [...DEFAULT_WORDS];
+        updateWordCount();
+    }
+
+    function tickWordQueue() {
+        if (!wordScene || !wordCamera || wordQueue.length === 0) return;
+
+        // 推进当前词
+        if (activeWord) {
+            activeWord.update();
+            if (!activeWord.isDone()) return;
+            activeWord = null;
+            queueIndex = (queueIndex + 1) % wordQueue.length;
         }
 
-        const today = new Date().toISOString().slice(0, 10);
+        // 启动下一个词
+        const nextWord = wordQueue[queueIndex];
+        if (nextWord) {
+            activeWord = new WordParticles(nextWord, wordScene, wordCamera);
+        }
+    }
 
-        fetch(SB_URL + '/rest/v1/page_visits', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': SB_ANON,
-                'Authorization': 'Bearer ' + SB_ANON,
-                'Prefer': 'return=minimal'
-            },
-            body: JSON.stringify({
-                visitor_id: vid,
-                date:       today,
-                referrer:   document.referrer || null,
-                user_agent: navigator.userAgent,
-                page:       location.pathname
-            })
-        }).catch(() => {}); // silent fail, never block the page
-    })();
+    /* ─── 等待 main.js 完成初始化后接入 ─────────────────────────────────── */
+    window.addEventListener('load', () => {
+        requestAnimationFrame(() => {
+            wordScene  = scene;   // 来自 main.js 全局变量
+            wordCamera = camera;
+            fetchWords().then(() => {
+                // 延迟 1s 再开始，让银河先渲染出来
+                setTimeout(() => {
+                    tickWordQueue();
+                }, 1000);
+            });
+        });
+    });
+
+    /* ─── 把 tickWordQueue 挂入渲染循环 ─────────────────────────────────── */
+    // main.js 的 animate() 每帧调用 galaxy.update()，我们在此基础上追加
+    window._wordTick = tickWordQueue;
     </script>
 </body>
 </html>

@@ -64,6 +64,7 @@ function animate() {
     requestAnimationFrame(animate);
     galaxy.update();
     controls.update();
+    if (typeof window._wordTick === 'function') window._wordTick();
     renderer.render(scene, camera);
 }
 

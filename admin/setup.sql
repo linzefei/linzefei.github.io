@@ -59,7 +59,52 @@ create policy "auth all" on site_content
   for all to authenticated using (true) with check (true);
 
 
--- 4. 默认内容配置
+-- 4. 统一词库表（默认词 + 游客留词）
+create table if not exists visitor_words (
+  id          uuid        default gen_random_uuid() primary key,
+  created_at  timestamptz default now(),
+  word        text        not null check (char_length(word) between 1 and 20),
+  visitor_id  text,
+  approved    boolean     default true,   -- 管理员可下架
+  source      text        default 'visitor',  -- 'default' | 'visitor'
+  sort_order  int         default 999     -- 默认词按此排序，游客词按时间
+);
+
+alter table visitor_words enable row level security;
+
+-- 任何人可以写
+create policy "anon insert words" on visitor_words
+  for insert to anon with check (true);
+
+-- 任何人可以读已审核的
+create policy "anon select approved" on visitor_words
+  for select to anon using (approved = true);
+
+-- 管理员可读写全部
+create policy "auth all words" on visitor_words
+  for all to authenticated using (true) with check (true);
+
+
+-- 5. 把旧 textData.js displayOrder 里的默认词迁移入 visitor_words
+--    source='default'，sort_order 从 1 开始，保持原顺序
+--    on conflict (word) 保持幂等，重复执行不报错
+insert into visitor_words (word, source, sort_order, approved) values
+  ('Hello World!', 'default',  1, true),
+  ('Three.js',     'default',  2, true),
+  ('JavaScript',   'default',  3, true),
+  ('Python',       'default',  4, true),
+  ('Java',         'default',  5, true),
+  ('C++',          'default',  6, true),
+  ('React',        'default',  7, true),
+  ('Vue',          'default',  8, true),
+  ('Angular',      'default',  9, true),
+  ('Node.js',      'default', 10, true),
+  ('linzefei',     'default', 11, true),
+  ('Cursor',       'default', 12, true),
+  ('2025',         'default', 13, true)
+on conflict do nothing;
+
+-- 6. 保留旧 site_content 表的 display_order 键（向后兼容，实际不再使用）
 insert into site_content (key, value)
 values ('display_order', '["Hello World!", "Three.js", "JavaScript", "Python", "Java", "C++", "React", "Vue", "Angular", "Node.js", "linzefei", "Cursor", "2025"]')
 on conflict (key) do nothing;
