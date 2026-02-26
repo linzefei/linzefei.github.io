@@ -152,7 +152,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div id="logo">linzefei</div>
+    <div id="logo">linzefei <a href="/words.html" style="font-size:11px;letter-spacing:2px;color:rgba(140,200,255,0.3);text-decoration:none;margin-left:14px;vertical-align:middle;" onmouseover="this.style.color='rgba(140,200,255,0.8)'" onmouseout="this.style.color='rgba(140,200,255,0.3)'">words →</a></div>
     <div id="hint">drag to explore &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; click to ignite</div>
     <div id="stats">
         <div id="particle-count"></div>
@@ -178,11 +178,43 @@
     const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
     const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON };
 
-    /* ─── 游客 ID ────────────────────────────────────────────────────────── */
+    /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
     if (!vid) {
         vid = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
         localStorage.setItem('_vid', vid);
+    }
+    let tok = localStorage.getItem('_tok');
+    if (!tok) {
+        const arr = crypto.getRandomValues(new Uint8Array(24));
+        tok = 't_' + Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem('_tok', tok);
+    }
+
+    /* ─── 工具：SHA-256 哈希 ─────────────────────────────────────────────── */
+    async function sha256hex(str) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    /* ─── 注册访客身份（首次或跨页面）─────────────────────────────────────── */
+    async function ensureVisitorRegistered() {
+        if (sessionStorage.getItem('_vis_reg')) return;
+        try {
+            const hash = await sha256hex(tok);
+            // 检测国家（ip-api.com 免费，无需 key）
+            let country = null, countryCode = null;
+            try {
+                const geo = await fetch('https://ip-api.com/json?fields=country,countryCode', { cache: 'force-cache' });
+                if (geo.ok) { const g = await geo.json(); country = g.country; countryCode = g.countryCode; }
+            } catch {}
+            await fetch(SB_URL + '/rest/v1/visitors', {
+                method: 'POST',
+                headers: { ...SB_HDR, 'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates' },
+                body: JSON.stringify({ id: vid, token_hash: hash, country, country_code: countryCode })
+            });
+            sessionStorage.setItem('_vis_reg', '1');
+        } catch {}
     }
 
     /* ─── 访问统计 ───────────────────────────────────────────────────────── */
@@ -264,11 +296,18 @@
 
     /* ─── 本人提交词持久化（localStorage）────────────────────────────────── */
     const MY_WORDS_KEY = '_my_words';
+    const MY_TIMES_KEY = '_my_times';
     function saveMyWord(word) {
         const list = getMyWords();
         if (!list.includes(word)) {
             list.unshift(word);
             localStorage.setItem(MY_WORDS_KEY, JSON.stringify(list.slice(0, 20)));
+        }
+        // 记录提交时间（已有的不覆盖）
+        const times = JSON.parse(localStorage.getItem(MY_TIMES_KEY) || '{}');
+        if (!times[word]) {
+            times[word] = new Date().toISOString();
+            localStorage.setItem(MY_TIMES_KEY, JSON.stringify(times));
         }
     }
     function getMyWords() {
@@ -336,6 +375,9 @@
 
     /* ─── 等待 main.js 完成初始化后接入 ─────────────────────────────────── */
     window.addEventListener('load', () => {
+        // 注册访客（后台静默，不阻塞渲染）
+        ensureVisitorRegistered();
+
         requestAnimationFrame(() => {
             wordScene  = scene;   // 来自 main.js 全局变量
             wordCamera = camera;

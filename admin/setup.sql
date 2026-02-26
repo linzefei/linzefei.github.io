@@ -104,7 +104,58 @@ insert into visitor_words (word, source, sort_order, approved) values
   ('2025',         'default', 13, true)
 on conflict do nothing;
 
--- 6. 保留旧 site_content 表的 display_order 键（向后兼容，实际不再使用）
+-- 6. 访客身份表（token_hash 防伪造，display_name 可选，country 自动检测）
+create extension if not exists pgcrypto;
+
+create table if not exists visitors (
+  id           text        primary key,          -- = visitor_id（公开）
+  created_at   timestamptz default now(),
+  token_hash   text        not null,             -- SHA-256(token)，防伪造
+  display_name text        check (char_length(display_name) <= 30),
+  country      text,                             -- 国家名，如 "China"
+  country_code text                              -- ISO 代码，如 "CN"（用于国旗 emoji）
+);
+
+alter table visitors enable row level security;
+
+create policy "anon insert visitor" on visitors
+  for insert to anon with check (true);
+
+create policy "anon select visitors" on visitors
+  for select to anon using (true);
+
+create policy "auth all visitors" on visitors
+  for all to authenticated using (true) with check (true);
+
+
+-- 7. 安全改名 RPC：验证 token_hash 通过后才允许更新 display_name
+create or replace function update_visitor_name(
+  p_visitor_id text,
+  p_token      text,
+  p_name       text
+) returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_hash text;
+begin
+  select token_hash into v_hash from visitors where id = p_visitor_id;
+  if v_hash is null then return false; end if;
+  if v_hash = encode(digest(p_token, 'sha256'), 'hex') then
+    update visitors
+      set display_name = nullif(trim(p_name), '')
+      where id = p_visitor_id;
+    return true;
+  end if;
+  return false;
+end;
+$$;
+
+grant execute on function update_visitor_name(text, text, text) to anon;
+
+
+-- 8. 保留旧 site_content 表的 display_order 键（向后兼容，实际不再使用）
 insert into site_content (key, value)
 values ('display_order', '["Hello World!", "Three.js", "JavaScript", "Python", "Java", "C++", "React", "Vue", "Angular", "Node.js", "linzefei", "Cursor", "2025"]')
 on conflict (key) do nothing;

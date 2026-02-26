@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Words · linzefei</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000308;
+            color: rgba(255,255,255,0.78);
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        /* ── Header ── */
+        header {
+            position: sticky; top: 0; z-index: 10;
+            padding: 16px 28px;
+            border-bottom: 1px solid rgba(140,200,255,0.08);
+            background: rgba(0,3,8,0.92);
+            backdrop-filter: blur(14px);
+            display: flex; align-items: center; gap: 18px;
+        }
+        header a {
+            color: rgba(140,200,255,0.45);
+            text-decoration: none;
+            font-size: 11px; letter-spacing: 2px;
+            transition: color .2s;
+        }
+        header a:hover { color: rgba(140,200,255,0.9); }
+        header h1 {
+            font-size: 13px; letter-spacing: 5px; font-weight: 300;
+            color: rgba(255,255,255,0.4); text-transform: uppercase;
+        }
+
+        /* ── Layout ── */
+        .container { max-width: 700px; margin: 0 auto; padding: 40px 22px; }
+
+        section { margin-bottom: 52px; }
+
+        .section-title {
+            font-size: 10px; letter-spacing: 4px; text-transform: uppercase;
+            color: rgba(140,200,255,0.38);
+            margin-bottom: 18px; padding-bottom: 10px;
+            border-bottom: 1px solid rgba(140,200,255,0.07);
+        }
+
+        /* ── Identity card ── */
+        .identity-card {
+            background: rgba(140,200,255,0.03);
+            border: 1px solid rgba(140,200,255,0.1);
+            border-radius: 12px; padding: 20px;
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        .identity-row { display: flex; align-items: center; gap: 12px; }
+        .name-display { font-size: 20px; font-weight: 300; flex: 1; letter-spacing: 1px; }
+        .identity-sub {
+            font-size: 11px; color: rgba(255,255,255,0.2);
+            font-family: monospace; letter-spacing: 0.5px;
+            display: flex; gap: 18px; flex-wrap: wrap;
+        }
+        .identity-sub span { display: flex; align-items: center; gap: 5px; }
+
+        /* Edit button */
+        .edit-btn {
+            background: none;
+            border: 1px solid rgba(140,200,255,0.28);
+            border-radius: 6px; color: rgba(140,200,255,0.6);
+            font-size: 11px; letter-spacing: 1.5px;
+            padding: 5px 12px; cursor: pointer; transition: all .2s;
+        }
+        .edit-btn:hover { border-color: rgba(140,200,255,0.7); color: #fff; }
+
+        /* Name editor */
+        .name-editor { display: none; flex-direction: column; gap: 8px; }
+        .name-editor.open { display: flex; }
+        .name-input-row { display: flex; gap: 8px; }
+        .name-input {
+            flex: 1;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(140,200,255,0.22);
+            border-radius: 7px; color: #fff;
+            font-size: 14px; padding: 8px 12px; outline: none;
+        }
+        .name-input:focus { border-color: rgba(140,200,255,0.55); }
+        .save-btn {
+            background: rgba(140,200,255,0.1);
+            border: 1px solid rgba(140,200,255,0.32);
+            border-radius: 7px; color: rgba(140,200,255,0.88);
+            font-size: 11px; letter-spacing: 1.5px;
+            padding: 8px 16px; cursor: pointer; transition: all .2s; white-space: nowrap;
+        }
+        .save-btn:hover { background: rgba(140,200,255,0.2); color: #fff; }
+        .save-btn:disabled { opacity: 0.35; cursor: default; }
+        .name-hint { font-size: 11px; color: rgba(255,255,255,0.2); }
+        .name-msg { font-size: 11px; color: rgba(140,200,255,0.6); min-height: 14px; }
+
+        /* ── Word cards ── */
+        .word-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .word-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.055);
+            border-radius: 10px; padding: 13px 18px;
+            display: flex; align-items: center; gap: 14px;
+            transition: border-color .2s;
+        }
+        .word-card:hover { border-color: rgba(140,200,255,0.14); }
+
+        .word-text {
+            font-size: 16px; font-weight: 300;
+            letter-spacing: 2px; flex: 1;
+        }
+        .word-right {
+            display: flex; flex-direction: column;
+            align-items: flex-end; gap: 4px; flex-shrink: 0;
+        }
+        .status-badge {
+            font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+            padding: 2px 8px; border-radius: 20px;
+        }
+        .status-approved {
+            background: rgba(100,220,120,0.1); color: rgba(100,220,120,0.8);
+            border: 1px solid rgba(100,220,120,0.2);
+        }
+        .status-pending {
+            background: rgba(255,180,60,0.08); color: rgba(255,180,60,0.7);
+            border: 1px solid rgba(255,180,60,0.18);
+        }
+        .word-meta {
+            font-size: 10px; color: rgba(255,255,255,0.2);
+            letter-spacing: 0.5px; text-align: right;
+        }
+        .word-author {
+            font-size: 11px; color: rgba(140,200,255,0.4); letter-spacing: 1px;
+        }
+        .flag { font-size: 14px; }
+
+        .empty-hint {
+            text-align: center; padding: 36px 0;
+            color: rgba(255,255,255,0.14);
+            font-size: 12px; letter-spacing: 2px;
+        }
+        .loading {
+            text-align: center; padding: 28px 0;
+            color: rgba(255,255,255,0.12);
+            font-size: 11px; letter-spacing: 3px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/">← galaxy</a>
+        <h1>Words</h1>
+    </header>
+
+    <div class="container">
+
+        <!-- 身份 -->
+        <section>
+            <div class="section-title">Your Identity</div>
+            <div class="identity-card">
+                <div class="identity-row">
+                    <div class="name-display" id="name-display">·  ·  ·</div>
+                    <button class="edit-btn" id="edit-name-btn">Edit Name</button>
+                </div>
+                <div class="identity-sub" id="identity-sub"></div>
+
+                <div class="name-editor" id="name-editor">
+                    <div class="name-input-row">
+                        <input class="name-input" id="name-input" type="text" maxlength="30"
+                               placeholder="display name (optional)" autocomplete="off" />
+                        <button class="save-btn" id="save-name-btn">Save</button>
+                    </div>
+                    <div class="name-hint">max 30 chars · visible to all visitors once set</div>
+                    <div class="name-msg" id="name-msg"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 我的词 -->
+        <section>
+            <div class="section-title">Your Words</div>
+            <div class="word-list" id="my-word-list">
+                <div class="loading">loading · · ·</div>
+            </div>
+        </section>
+
+        <!-- 全部公开词 -->
+        <section>
+            <div class="section-title">All Words in the Galaxy</div>
+            <div class="word-list" id="all-word-list">
+                <div class="loading">loading · · ·</div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+    /* ── Supabase ───────────────────────────────────────────────────────── */
+    const SB_URL  = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
+    const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
+    const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON };
+
+    /* ── 身份 ────────────────────────────────────────────────────────────── */
+    let vid = localStorage.getItem('_vid');
+    if (!vid) { vid = 'v_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('_vid', vid); }
+
+    let tok = localStorage.getItem('_tok');
+    if (!tok) {
+        const arr = crypto.getRandomValues(new Uint8Array(24));
+        tok = 't_' + Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+        localStorage.setItem('_tok', tok);
+    }
+
+    async function sha256hex(str) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    /* ── 国旗 emoji ──────────────────────────────────────────────────────── */
+    function countryFlag(code) {
+        if (!code || code.length !== 2) return '';
+        return String.fromCodePoint(...[...code.toUpperCase()].map(c => c.charCodeAt(0) + 127397));
+    }
+
+    /* ── 相对时间 ────────────────────────────────────────────────────────── */
+    function reltime(ts) {
+        const d = Date.now() - new Date(ts).getTime();
+        const m = Math.floor(d / 60000), h = Math.floor(d / 3600000), days = Math.floor(d / 86400000);
+        if (m < 1)    return 'just now';
+        if (m < 60)   return m + 'm ago';
+        if (h < 24)   return h + 'h ago';
+        if (days < 30) return days + 'd ago';
+        return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── 注册访客（若未注册）────────────────────────────────────────────── */
+    async function ensureRegistered() {
+        if (sessionStorage.getItem('_vis_reg')) return;
+        try {
+            const hash = await sha256hex(tok);
+            let country = null, countryCode = null;
+            try {
+                const g = await fetch('https://ip-api.com/json?fields=country,countryCode', { cache: 'force-cache' });
+                if (g.ok) { const j = await g.json(); country = j.country; countryCode = j.countryCode; }
+            } catch {}
+            await fetch(SB_URL + '/rest/v1/visitors', {
+                method: 'POST',
+                headers: { ...SB_HDR, 'Content-Type': 'application/json', 'Prefer': 'return=minimal,resolution=ignore-duplicates' },
+                body: JSON.stringify({ id: vid, token_hash: hash, country, country_code: countryCode })
+            });
+            sessionStorage.setItem('_vis_reg', '1');
+        } catch {}
+    }
+
+    /* ── 加载本人信息 ────────────────────────────────────────────────────── */
+    async function loadMyInfo() {
+        const nameEl = document.getElementById('name-display');
+        const subEl  = document.getElementById('identity-sub');
+        let displayName = 'Anonymous', country = '', countryCode = '';
+
+        try {
+            const res = await fetch(
+                SB_URL + '/rest/v1/visitors?id=eq.' + encodeURIComponent(vid) + '&select=display_name,country,country_code',
+                { headers: SB_HDR }
+            );
+            if (res.ok) {
+                const rows = await res.json();
+                if (rows[0]) {
+                    displayName  = rows[0].display_name || 'Anonymous';
+                    country      = rows[0].country      || '';
+                    countryCode  = rows[0].country_code || '';
+                }
+            }
+        } catch {}
+
+        nameEl.textContent = displayName;
+        document.getElementById('name-input').value = displayName === 'Anonymous' ? '' : displayName;
+
+        const flag = countryFlag(countryCode);
+        subEl.innerHTML = `
+            <span>ID: ${esc(vid.slice(0, 20))}…</span>
+            ${country ? `<span>${flag} ${esc(country)}</span>` : ''}
+        `;
+    }
+
+    /* ── 改名面板 ────────────────────────────────────────────────────────── */
+    document.getElementById('edit-name-btn').addEventListener('click', () => {
+        const ed = document.getElementById('name-editor');
+        ed.classList.toggle('open');
+        if (ed.classList.contains('open')) document.getElementById('name-input').focus();
+    });
+    document.getElementById('name-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('save-name-btn').click();
+    });
+    document.getElementById('save-name-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('save-name-btn');
+        const msg = document.getElementById('name-msg');
+        const newName = document.getElementById('name-input').value.trim();
+        btn.disabled = true; msg.textContent = 'saving...';
+        try {
+            const res = await fetch(SB_URL + '/rest/v1/rpc/update_visitor_name', {
+                method: 'POST',
+                headers: { ...SB_HDR, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ p_visitor_id: vid, p_token: tok, p_name: newName })
+            });
+            if (res.ok && await res.json()) {
+                document.getElementById('name-display').textContent = newName || 'Anonymous';
+                msg.textContent = '✦ saved';
+                setTimeout(() => { msg.textContent = ''; document.getElementById('name-editor').classList.remove('open'); }, 1400);
+            } else {
+                msg.textContent = 'verification failed';
+            }
+        } catch { msg.textContent = 'network error'; }
+        btn.disabled = false;
+    });
+
+    /* ── 我的词（localStorage + DB 交叉核对审批状态）──────────────────────── */
+    async function loadMyWords() {
+        const el = document.getElementById('my-word-list');
+        let myWords = [], myTimes = {};
+        try {
+            myWords = JSON.parse(localStorage.getItem('_my_words') || '[]');
+            myTimes = JSON.parse(localStorage.getItem('_my_times') || '{}');
+        } catch {}
+
+        if (myWords.length === 0) {
+            el.innerHTML = '<div class="empty-hint">no words yet · go leave one in the galaxy</div>';
+            return;
+        }
+
+        // 从 DB 查哪些词已过审
+        let approvedSet = new Set();
+        try {
+            const res = await fetch(
+                SB_URL + '/rest/v1/visitor_words?select=word&approved=eq.true&limit=500',
+                { headers: SB_HDR }
+            );
+            if (res.ok) (await res.json()).forEach(r => approvedSet.add(r.word));
+        } catch {}
+
+        el.innerHTML = '';
+        myWords.forEach(word => {
+            const approved = approvedSet.has(word);
+            const ts       = myTimes[word];
+            const card = document.createElement('div');
+            card.className = 'word-card';
+            card.innerHTML = `
+                <div class="word-text">${esc(word)}</div>
+                <div class="word-right">
+                    <span class="status-badge ${approved ? 'status-approved' : 'status-pending'}">
+                        ${approved ? '✓ visible' : '⏳ pending'}
+                    </span>
+                    ${ts ? `<div class="word-meta">${reltime(ts)}</div>` : ''}
+                </div>`;
+            el.appendChild(card);
+        });
+    }
+
+    /* ── 全部公开词 ──────────────────────────────────────────────────────── */
+    async function loadAllWords() {
+        const el = document.getElementById('all-word-list');
+        try {
+            const res = await fetch(
+                SB_URL + '/rest/v1/visitor_words?select=word,created_at,visitor_id,source&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
+                { headers: SB_HDR }
+            );
+            if (!res.ok) throw new Error();
+            const words = await res.json();
+
+            if (words.length === 0) {
+                el.innerHTML = '<div class="empty-hint">no words yet</div>'; return;
+            }
+
+            // 批量查 visitor 名字和国家
+            const vids = [...new Set(words.map(w => w.visitor_id).filter(Boolean))];
+            let visitorMap = {};   // vid → { display_name, country_code }
+            if (vids.length > 0) {
+                try {
+                    const vRes = await fetch(
+                        SB_URL + '/rest/v1/visitors?id=in.(' + vids.map(encodeURIComponent).join(',') + ')&select=id,display_name,country_code',
+                        { headers: SB_HDR }
+                    );
+                    if (vRes.ok) (await vRes.json()).forEach(v => { visitorMap[v.id] = v; });
+                } catch {}
+            }
+
+            el.innerHTML = '';
+            words.forEach(w => {
+                const v    = visitorMap[w.visitor_id] || {};
+                const name = w.source === 'default'
+                    ? 'system'
+                    : (v.display_name || 'anon·' + (w.visitor_id || '?').slice(-4));
+                const flag = countryFlag(v.country_code);
+                const ts   = w.created_at ? reltime(w.created_at) : '';
+
+                const card = document.createElement('div');
+                card.className = 'word-card';
+                card.innerHTML = `
+                    <div class="word-text">${esc(w.word)}</div>
+                    <div class="word-right">
+                        <div class="word-author">${flag ? flag + ' ' : ''}${esc(name)}</div>
+                        ${ts ? `<div class="word-meta">${ts}</div>` : ''}
+                    </div>`;
+                el.appendChild(card);
+            });
+        } catch {
+            el.innerHTML = '<div class="empty-hint">could not load · try again later</div>';
+        }
+    }
+
+    /* ── Init ────────────────────────────────────────────────────────────── */
+    async function init() {
+        await ensureRegistered();
+        await Promise.all([ loadMyInfo(), loadMyWords(), loadAllWords() ]);
+    }
+
+    init();
+    </script>
+</body>
+</html>
