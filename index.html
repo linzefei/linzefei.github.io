@@ -1,173 +1,113 @@
 <!DOCTYPE html>
-<html lang="en">
-
+<html lang="zh">
 <head>
-	<meta charset="UTF-8">
-	<title>3D Text Animation</title>
-	<style>
-		body { 
-			margin: 0; 
-			overflow: hidden;
-		}
-		canvas { 
-			display: block; 
-		}
-		#controls {
-			position: fixed;
-			bottom: 20px;
-			left: 50%;
-			transform: translateX(-50%);
-			z-index: 100;
-			background: rgba(0, 0, 0, 0.5);
-			padding: 10px;
-			border-radius: 5px;
-			display: flex;
-			gap: 10px;
-			align-items: center;
-		}
-		#mode-switch {
-			padding: 8px 16px;
-			border: none;
-			border-radius: 4px;
-			background: #4CAF50;
-			color: white;
-			cursor: pointer;
-			font-size: 14px;
-		}
-		#mode-switch:hover {
-			background: #45a049;
-		}
-		#mode-label {
-			color: white;
-			font-family: Arial, sans-serif;
-		}
-		.control-button {
-			padding: 8px 16px;
-			border: none;
-			border-radius: 4px;
-			background: #4CAF50;
-			color: white;
-			cursor: pointer;
-			font-size: 14px;
-		}
-		.control-button:hover {
-			background: #45a049;
-		}
-		.control-button.active {
-			background: #2196F3;
-		}
-		#debug-controls {
-			position: fixed;
-			bottom: 20px;
-			right: 20px;
-			z-index: 100;
-			background: rgba(0, 0, 0, 0.5);
-			padding: 10px;
-			border-radius: 5px;
-			color: white;
-			font-family: Arial, sans-serif;
-		}
-		.debug-info {
-			margin-bottom: 5px;
-		}
-		.speed-control {
-			margin-top: 10px;
-			color: white;
-			font-family: Arial, sans-serif;
-		}
-		#speed-slider {
-			width: 100%;
-			margin-top: 5px;
-		}
-		#logo {
-			position: fixed;
-			bottom: 20px;
-			left: 20px;
-			z-index: 100;
-			color: rgba(255, 255, 255, 0.6);
-			font-family: Arial, sans-serif;
-			font-size: 14px;
-			user-select: none;
-			display: flex;
-			align-items: center;
-			gap: 10px;
-		}
-		#logo .version {
-			color: rgba(255, 255, 255, 0.4);
-			font-size: 12px;
-			padding: 2px 6px;
-			border: 1px solid rgba(255, 255, 255, 0.2);
-			border-radius: 3px;
-		}
-		#logo a {
-			color: #4CAF50;
-			text-decoration: none;
-			transition: color 0.3s;
-		}
-		#logo a:hover {
-			color: #45a049;
-		}
-		#advanced-controls {
-			margin-top: 10px;
-			padding-top: 10px;
-			border-top: 1px solid rgba(255, 255, 255, 0.2);
-			display: none;
-		}
-		.trail-control {
-			margin: 10px 0;
-		}
-		#show-advanced {
-			color: rgba(255, 255, 255, 0.4);
-			font-size: 12px;
-			cursor: pointer;
-			text-align: center;
-			margin-top: 10px;
-			padding: 5px 0;
-		}
-		#show-advanced:hover {
-			color: rgba(255, 255, 255, 0.6);
-		}
-		#reset-settings {
-			background: #ff4444;
-			margin-top: 10px;
-			width: 100%;
-		}
-		#reset-settings:hover {
-			background: #cc3333;
-		}
-	</style>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy · linzefei</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            cursor: crosshair;
+        }
+        canvas { display: block; }
+
+        /* Top-left branding */
+        #logo {
+            position: fixed;
+            top: 22px; left: 24px;
+            color: rgba(255,255,255,0.35);
+            font-size: 15px;
+            letter-spacing: 5px;
+            text-transform: lowercase;
+            pointer-events: none;
+            user-select: none;
+        }
+
+        /* Bottom centre hint */
+        #hint {
+            position: fixed;
+            bottom: 24px; left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.22);
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            pointer-events: none;
+            user-select: none;
+            transition: opacity 1s;
+        }
+
+        /* Top-right stats */
+        #stats {
+            position: fixed;
+            top: 22px; right: 22px;
+            color: rgba(255,255,255,0.18);
+            font-size: 11px;
+            text-align: right;
+            pointer-events: none;
+            user-select: none;
+            letter-spacing: 1px;
+        }
+
+        /* Click ripple */
+        .ripple {
+            position: fixed;
+            border-radius: 50%;
+            border: 1.5px solid rgba(140, 200, 255, 0.7);
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0);
+            animation: rippleAnim 0.9s ease-out forwards;
+        }
+        @keyframes rippleAnim {
+            0%   { transform: translate(-50%,-50%) scale(0);  opacity: 1; }
+            100% { transform: translate(-50%,-50%) scale(1);  opacity: 0; width: 160px; height: 160px; }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
-
 <body>
-	<div id="controls">
-		<button id="mode-switch" class="control-button">操作模式：旋转镜头</button>
-	</div>
-	<div id="logo">
-		<span class="version">v0.1.2</span>
-		Powered by <a href="https://cursor.sh" target="_blank">Cursor</a>
-	</div>
-	<div id="debug-controls">
-		<div id="show-advanced">显示高级选项</div>
-		<div id="advanced-controls">
-			<div class="debug-info">显示轨道: <span id="orbit-count">1</span> / <span id="total-orbits">0</span></div>
-			<button id="orbit-debug" class="control-button">切换轨道</button>
-			<button id="show-all-orbits" class="control-button">显示全部轨道</button>
-			<div class="speed-control">
-				<label for="speed-slider">旋转速度: <span id="speed-value">1.0</span></label>
-				<input type="range" id="speed-slider" min="0.1" max="5.0" step="0.1" value="1.0">
-			</div>
-			<div class="trail-control">
-				<button id="trail-switch" class="control-button">轨迹显示：部分</button>
-			</div>
-			<button id="reset-settings" class="control-button">重置所有设置</button>
-		</div>
-	</div>
-	<script src="js/textData.js"></script>
-	<script src="js/config.js"></script>
-	<script src="js/text3d.js"></script>
-	<script src="js/main.js"></script>
-</body>
+    <div id="logo">linzefei</div>
+    <div id="hint">drag to explore &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; click to ignite</div>
+    <div id="stats">
+        <div id="particle-count"></div>
+    </div>
 
+    <script src="js/config.js"></script>
+    <script src="js/galaxy.js"></script>
+    <script src="js/main.js"></script>
+
+    <script>
+    // ── Click ripple + shooting star burst ─────────────────────────────────
+    document.addEventListener('click', function(e) {
+        // Visual ripple on screen
+        const div = document.createElement('div');
+        div.className = 'ripple';
+        div.style.left = e.clientX + 'px';
+        div.style.top  = e.clientY + 'px';
+        div.style.width  = '0px';
+        div.style.height = '0px';
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 950);
+
+        // Trigger 2-4 shooting stars in the galaxy if it's ready
+        if (typeof galaxy !== 'undefined' && galaxy) {
+            const burst = 2 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < burst; i++) {
+                setTimeout(() => galaxy._spawnShootingStar(), i * 80);
+            }
+        }
+    });
+
+    // Hide hint after 6 s
+    setTimeout(() => {
+        const h = document.getElementById('hint');
+        if (h) h.style.opacity = '0';
+    }, 6000);
+    </script>
+</body>
 </html>
