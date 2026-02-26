@@ -1,5 +1,6 @@
 -- ─────────────────────────────────────────────────────────────
 -- 在 Supabase → SQL Editor 中运行此文件完成初始化
+-- 幂等：可重复执行，policy 用 drop if exists 保证不报错
 -- ─────────────────────────────────────────────────────────────
 
 -- 1. 访问记录表
@@ -15,11 +16,12 @@ create table if not exists page_visits (
 
 alter table page_visits enable row level security;
 
--- 任何人可写（前端埋点用）
+drop policy if exists "anon insert"  on page_visits;
+drop policy if exists "auth select"  on page_visits;
+
 create policy "anon insert" on page_visits
   for insert to anon with check (true);
 
--- 只有登录用户可读
 create policy "auth select" on page_visits
   for select to authenticated using (true);
 
@@ -34,6 +36,9 @@ create table if not exists site_tags (
 );
 
 alter table site_tags enable row level security;
+
+drop policy if exists "anon select" on site_tags;
+drop policy if exists "auth all"    on site_tags;
 
 create policy "anon select" on site_tags
   for select to anon using (true);
@@ -51,6 +56,9 @@ create table if not exists site_content (
 );
 
 alter table site_content enable row level security;
+
+drop policy if exists "anon select" on site_content;
+drop policy if exists "auth all"    on site_content;
 
 create policy "anon select" on site_content
   for select to anon using (true);
@@ -72,22 +80,21 @@ create table if not exists visitor_words (
 
 alter table visitor_words enable row level security;
 
--- 任何人可以写
+drop policy if exists "anon insert words"    on visitor_words;
+drop policy if exists "anon select approved" on visitor_words;
+drop policy if exists "auth all words"       on visitor_words;
+
 create policy "anon insert words" on visitor_words
   for insert to anon with check (true);
 
--- 任何人可以读已审核的
 create policy "anon select approved" on visitor_words
   for select to anon using (approved = true);
 
--- 管理员可读写全部
 create policy "auth all words" on visitor_words
   for all to authenticated using (true) with check (true);
 
 
--- 5. 把旧 textData.js displayOrder 里的默认词迁移入 visitor_words
---    source='default'，sort_order 从 1 开始，保持原顺序
---    on conflict (word) 保持幂等，重复执行不报错
+-- 5. 默认词入库（on conflict do nothing 保证幂等）
 insert into visitor_words (word, source, sort_order, approved) values
   ('Hello World!', 'default',  1, true),
   ('Three.js',     'default',  2, true),
@@ -104,6 +111,7 @@ insert into visitor_words (word, source, sort_order, approved) values
   ('2025',         'default', 13, true)
 on conflict do nothing;
 
+
 -- 6. 访客身份表（token_hash 防伪造，display_name 可选，country 自动检测）
 create extension if not exists pgcrypto;
 
@@ -117,6 +125,10 @@ create table if not exists visitors (
 );
 
 alter table visitors enable row level security;
+
+drop policy if exists "anon insert visitor"  on visitors;
+drop policy if exists "anon select visitors" on visitors;
+drop policy if exists "auth all visitors"    on visitors;
 
 create policy "anon insert visitor" on visitors
   for insert to anon with check (true);
