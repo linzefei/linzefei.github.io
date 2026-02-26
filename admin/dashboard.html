@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard · linzefei Admin</title>
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="brand">linzefei</div>
+      <div class="sub">Admin Console</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" onclick="switchTab('overview')" data-tab-link="overview">
+        <span class="icon">◈</span> 总览
+      </a>
+      <a class="nav-item" onclick="switchTab('stats')" data-tab-link="stats">
+        <span class="icon">◎</span> 访问统计
+      </a>
+      <a class="nav-item" onclick="switchTab('content')" data-tab-link="content">
+        <span class="icon">◉</span> 内容管理
+      </a>
+      <a class="nav-item" onclick="switchTab('tags')" data-tab-link="tags">
+        <span class="icon">◈</span> 标签管理
+      </a>
+      <a class="nav-item" onclick="switchTab('settings')" data-tab-link="settings">
+        <span class="icon">◌</span> 设置
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="logout" onclick="doLogout()">
+        <span>⎋</span> <span id="userEmail" style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ─────────────────────────────────────────────── -->
+  <div class="main">
+    <header class="topbar">
+      <h1 id="tabTitle">总览</h1>
+      <span class="badge">linzefei.com</span>
+      <a href="/" target="_blank" class="btn btn-ghost btn-sm">查看网站 →</a>
+    </header>
+
+    <div class="content">
+
+      <!-- ── 总览 ──────────────────────────────────────────── -->
+      <div class="tab-panel active" id="tab-overview">
+        <div class="grid-4">
+          <div class="card">
+            <div class="card-title">总访问量</div>
+            <div class="stat-num" id="totalVisits">–</div>
+            <div class="stat-sub">累计 PV</div>
+          </div>
+          <div class="card">
+            <div class="card-title">今日访问</div>
+            <div class="stat-num" id="todayVisits">–</div>
+            <div class="stat-sub">当日 PV</div>
+          </div>
+          <div class="card">
+            <div class="card-title">标签数量</div>
+            <div class="stat-num" id="tagsCount">–</div>
+            <div class="stat-sub">已配置</div>
+          </div>
+          <div class="card">
+            <div class="card-title">内容条目</div>
+            <div class="stat-num" id="contentCount">–</div>
+            <div class="stat-sub">数据库记录</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">最近访问</span>
+            <button class="btn btn-ghost btn-sm" onclick="loadRecentVisits()">刷新</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>时间</th><th>来源</th><th>User Agent</th></tr>
+              </thead>
+              <tbody id="recentTbody">
+                <tr><td colspan="3" class="empty-state">加载中…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 访问统计 ────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-stats">
+        <div class="grid-2" style="margin-bottom:20px">
+          <div class="card">
+            <div class="card-title">总 PV</div>
+            <div class="stat-num" id="totalPV">–</div>
+          </div>
+          <div class="card">
+            <div class="card-title">独立访客 (UV)</div>
+            <div class="stat-num" id="totalUV">–</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header"><span class="card-title">过去 14 天访问趋势</span></div>
+          <div class="chart-wrap" id="chartBars"></div>
+          <div class="chart-labels" id="chartLabels"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><span class="card-title">流量来源 Top 5</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>来源</th><th>次数</th><th>占比</th></tr></thead>
+              <tbody id="refTbody"><tr><td colspan="3" class="empty-state">加载中…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 内容管理 ────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">星系文字标签顺序（由内到外）</span>
+            <button class="btn btn-success btn-sm" onclick="saveContent()">保存</button>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:16px">拖拽排序，首个文字显示在星系核心，最后一个在最外层轨道</p>
+          <ul class="sortable-list" id="sortableList">
+            <li class="empty-state">加载中…</li>
+          </ul>
+          <hr class="divider">
+          <div class="input-row">
+            <input type="text" id="newContentItem" placeholder="添加新文字（如 Docker）" maxlength="30">
+            <button class="btn btn-primary btn-sm" onclick="addContentItem()">添加</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 标签管理 ────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-tags">
+        <div class="card">
+          <div class="card-header"><span class="card-title">已有标签</span></div>
+          <div class="tag-list" id="tagList">
+            <div class="empty-state">加载中…</div>
+          </div>
+          <hr class="divider">
+          <p class="section-title">添加新标签</p>
+          <div class="input-row">
+            <input type="text" id="tagName" placeholder="标签名（如 GitHub）" maxlength="30">
+            <input type="url"  id="tagUrl"  placeholder="链接（可选，如 https://…）">
+            <button class="btn btn-primary btn-sm" onclick="addTag()">添加</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 设置 ───────────────────────────────────────────── -->
+      <div class="tab-panel" id="tab-settings">
+        <div class="card" style="max-width:480px">
+          <div class="card-header"><span class="card-title">修改密码</span></div>
+          <div class="form-group">
+            <label>新密码</label>
+            <div class="inline-form">
+              <input type="password" id="newPass" placeholder="至少 8 位">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>确认新密码</label>
+            <div class="inline-form">
+              <input type="password" id="confirmPass" placeholder="再次输入">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="changePassword()">确认修改</button>
+        </div>
+
+        <div class="card" style="max-width:480px;margin-top:16px">
+          <div class="card-header"><span class="card-title">账号信息</span></div>
+          <p style="font-size:13px;color:var(--muted)">邮箱：<span id="settingEmail" style="color:var(--text)"></span></p>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">如需找回密码，请联系 Supabase 后台重置</p>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script src="js/auth.js"></script>
+<script src="js/dashboard.js"></script>
+<script>
+// Keep sidebar nav in sync with switchTab
+const _origSwitch = switchTab;
+window.switchTab = function(name) {
+    _origSwitch(name);
+    // Update sidebar active state
+    document.querySelectorAll('[data-tab-link]').forEach(el => {
+        el.classList.toggle('active', el.getAttribute('data-tab-link') === name);
+    });
+    // Update topbar title
+    const titles = { overview: '总览', stats: '访问统计', content: '内容管理', tags: '标签管理', settings: '设置' };
+    document.getElementById('tabTitle').textContent = titles[name] || name;
+    // Populate settings email
+    if (name === 'settings' && currentUser) {
+        document.getElementById('settingEmail').textContent = currentUser.email;
+    }
+};
+</script>
+</body>
+</html>
