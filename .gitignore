@@ -1,0 +1,11 @@
+# 环境变量（绝对不能进 git）
+.env
+.env.local
+.env.*.local
+
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+.wrangler/
