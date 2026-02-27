@@ -93,13 +93,9 @@ async function handleSubmitWord(request, env, origin) {
 }
 
 function corsResponse(body, status, origin, env) {
-  // 支持逗号分隔的多个来源，防止跨站滥用
-  const allowedOrigins = (env && env.ALLOWED_ORIGIN)
-    ? env.ALLOWED_ORIGIN.split(',').map(s => s.trim())
-    : ['*'];
-  const allow = allowedOrigins.includes('*') || allowedOrigins.includes(origin)
-    ? origin
-    : 'null';
+  // 调试模式：临时允许所有来源，确认 Worker 本身是否可达
+  // TODO: 验证通过后改回严格模式（检查 ALLOWED_ORIGIN 白名单）
+  const allow = origin || '*';
 
   return new Response(body, {
     status,
