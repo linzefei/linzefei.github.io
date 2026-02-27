@@ -12,190 +12,211 @@
             color: rgba(255,255,255,0.78);
             font-family: 'Helvetica Neue', Arial, sans-serif;
             min-height: 100vh;
-            padding-bottom: 80px;
         }
 
         /* ── Header ── */
         header {
             position: sticky; top: 0; z-index: 10;
-            padding: 16px 28px;
-            border-bottom: 1px solid rgba(140,200,255,0.08);
-            background: rgba(0,3,8,0.92);
-            backdrop-filter: blur(14px);
-            display: flex; align-items: center; gap: 18px;
+            padding: 14px 24px;
+            border-bottom: 1px solid rgba(140,200,255,0.07);
+            background: rgba(0,3,8,0.94);
+            backdrop-filter: blur(16px);
+            display: flex; align-items: center; gap: 14px;
         }
         header a {
-            color: rgba(140,200,255,0.45);
+            color: rgba(140,200,255,0.4);
             text-decoration: none;
             font-size: 11px; letter-spacing: 2px;
             transition: color .2s;
         }
-        header a:hover { color: rgba(140,200,255,0.9); }
+        header a:hover { color: rgba(140,200,255,0.85); }
+        .header-sep { color: rgba(255,255,255,0.1); }
         header h1 {
-            font-size: 13px; letter-spacing: 5px; font-weight: 300;
-            color: rgba(255,255,255,0.4); text-transform: uppercase;
+            font-size: 11px; letter-spacing: 5px; font-weight: 400;
+            color: rgba(255,255,255,0.3); text-transform: uppercase;
         }
 
         /* ── Layout ── */
-        .container { max-width: 700px; margin: 0 auto; padding: 40px 22px; }
+        .container { max-width: 680px; margin: 0 auto; padding: 36px 20px 80px; }
 
-        section { margin-bottom: 52px; }
-
-        .section-title {
-            font-size: 10px; letter-spacing: 4px; text-transform: uppercase;
-            color: rgba(140,200,255,0.38);
-            margin-bottom: 18px; padding-bottom: 10px;
-            border-bottom: 1px solid rgba(140,200,255,0.07);
+        /* ── Section ── */
+        .section { margin-bottom: 48px; }
+        .section-label {
+            font-size: 9px; letter-spacing: 4px; text-transform: uppercase;
+            color: rgba(140,200,255,0.28);
+            margin-bottom: 16px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .section-label::after {
+            content: ''; flex: 1; height: 1px;
+            background: rgba(140,200,255,0.06);
         }
 
         /* ── Identity card ── */
         .identity-card {
-            background: rgba(140,200,255,0.03);
-            border: 1px solid rgba(140,200,255,0.1);
-            border-radius: 12px; padding: 20px;
-            display: flex; flex-direction: column; gap: 12px;
+            background: rgba(140,200,255,0.025);
+            border: 1px solid rgba(140,200,255,0.09);
+            border-radius: 14px; padding: 20px 22px;
         }
-        .identity-row { display: flex; align-items: center; gap: 12px; }
-        .name-display { font-size: 20px; font-weight: 300; flex: 1; letter-spacing: 1px; }
-        .identity-sub {
-            font-size: 11px; color: rgba(255,255,255,0.2);
-            font-family: monospace; letter-spacing: 0.5px;
-            display: flex; gap: 18px; flex-wrap: wrap;
+        .identity-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .avatar {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(140,200,255,0.08);
+            border: 1px solid rgba(140,200,255,0.15);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; flex-shrink: 0;
         }
-        .identity-sub span { display: flex; align-items: center; gap: 5px; }
-
-        /* Edit button */
+        .name-display {
+            font-size: 17px; font-weight: 300; letter-spacing: 1px; flex: 1;
+        }
         .edit-btn {
             background: none;
-            border: 1px solid rgba(140,200,255,0.28);
-            border-radius: 6px; color: rgba(140,200,255,0.6);
-            font-size: 11px; letter-spacing: 1.5px;
-            padding: 5px 12px; cursor: pointer; transition: all .2s;
+            border: 1px solid rgba(140,200,255,0.2);
+            border-radius: 6px; color: rgba(140,200,255,0.5);
+            font-size: 10px; letter-spacing: 1.5px;
+            padding: 4px 10px; cursor: pointer; transition: all .2s;
         }
-        .edit-btn:hover { border-color: rgba(140,200,255,0.7); color: #fff; }
+        .edit-btn:hover { border-color: rgba(140,200,255,0.6); color: rgba(140,200,255,0.9); }
+
+        .identity-meta {
+            font-size: 10px; color: rgba(255,255,255,0.18);
+            font-family: monospace; display: flex; gap: 14px; flex-wrap: wrap;
+        }
 
         /* Name editor */
-        .name-editor { display: none; flex-direction: column; gap: 8px; }
+        .name-editor { display: none; margin-top: 14px; flex-direction: column; gap: 8px; }
         .name-editor.open { display: flex; }
         .name-input-row { display: flex; gap: 8px; }
         .name-input {
             flex: 1;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(140,200,255,0.22);
-            border-radius: 7px; color: #fff;
-            font-size: 14px; padding: 8px 12px; outline: none;
-        }
-        .name-input:focus { border-color: rgba(140,200,255,0.55); }
-        .save-btn {
-            background: rgba(140,200,255,0.1);
-            border: 1px solid rgba(140,200,255,0.32);
-            border-radius: 7px; color: rgba(140,200,255,0.88);
-            font-size: 11px; letter-spacing: 1.5px;
-            padding: 8px 16px; cursor: pointer; transition: all .2s; white-space: nowrap;
-        }
-        .save-btn:hover { background: rgba(140,200,255,0.2); color: #fff; }
-        .save-btn:disabled { opacity: 0.35; cursor: default; }
-        .name-hint { font-size: 11px; color: rgba(255,255,255,0.2); }
-        .name-msg { font-size: 11px; color: rgba(140,200,255,0.6); min-height: 14px; }
-
-        /* ── Word cards ── */
-        .word-list { display: flex; flex-direction: column; gap: 8px; }
-
-        .word-card {
-            background: rgba(255,255,255,0.02);
-            border: 1px solid rgba(255,255,255,0.055);
-            border-radius: 10px; padding: 13px 18px;
-            display: flex; align-items: center; gap: 14px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(140,200,255,0.18);
+            border-radius: 8px; color: #fff;
+            font-size: 13px; padding: 8px 12px; outline: none;
             transition: border-color .2s;
         }
-        .word-card:hover { border-color: rgba(140,200,255,0.14); }
+        .name-input:focus { border-color: rgba(140,200,255,0.45); }
+        .save-btn {
+            background: rgba(140,200,255,0.08);
+            border: 1px solid rgba(140,200,255,0.25);
+            border-radius: 8px; color: rgba(140,200,255,0.8);
+            font-size: 10px; letter-spacing: 1.5px;
+            padding: 8px 14px; cursor: pointer; transition: all .2s; white-space: nowrap;
+        }
+        .save-btn:hover { background: rgba(140,200,255,0.16); color: #fff; }
+        .save-btn:disabled { opacity: 0.3; cursor: default; }
+        .name-hint { font-size: 10px; color: rgba(255,255,255,0.18); }
+        .name-msg  { font-size: 10px; color: rgba(140,200,255,0.6); min-height: 12px; }
 
-        .word-text {
-            font-size: 16px; font-weight: 300;
-            letter-spacing: 2px; flex: 1;
+        /* ── Word chips (all words) ── */
+        .word-cloud {
+            display: flex; flex-wrap: wrap; gap: 8px;
         }
-        .word-right {
-            display: flex; flex-direction: column;
-            align-items: flex-end; gap: 4px; flex-shrink: 0;
+        .word-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 20px;
+            padding: 5px 13px;
+            font-size: 13px; font-weight: 300; letter-spacing: 1.5px;
+            transition: border-color .2s, background .2s;
+            cursor: default;
         }
-        .status-badge {
-            font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+        .word-chip:hover {
+            border-color: rgba(140,200,255,0.2);
+            background: rgba(140,200,255,0.04);
+        }
+        .chip-flag { font-size: 11px; }
+        .chip-author { font-size: 9px; color: rgba(140,200,255,0.35); letter-spacing: 1px; }
+
+        /* ── My words ── */
+        .my-words { display: flex; flex-direction: column; gap: 6px; }
+        .my-word-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 14px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px;
+            transition: border-color .2s;
+        }
+        .my-word-row:hover { border-color: rgba(140,200,255,0.12); }
+        .my-word-text { flex: 1; font-size: 14px; font-weight: 300; letter-spacing: 1.5px; }
+        .status-pill {
+            font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase;
             padding: 2px 8px; border-radius: 20px;
         }
-        .status-approved {
-            background: rgba(100,220,120,0.1); color: rgba(100,220,120,0.8);
-            border: 1px solid rgba(100,220,120,0.2);
+        .pill-ok {
+            background: rgba(80,210,110,0.08);
+            color: rgba(80,210,110,0.75);
+            border: 1px solid rgba(80,210,110,0.18);
         }
-        .status-pending {
-            background: rgba(255,180,60,0.08); color: rgba(255,180,60,0.7);
-            border: 1px solid rgba(255,180,60,0.18);
+        .pill-pending {
+            background: rgba(255,175,50,0.07);
+            color: rgba(255,175,50,0.65);
+            border: 1px solid rgba(255,175,50,0.15);
         }
-        .word-meta {
-            font-size: 10px; color: rgba(255,255,255,0.2);
-            letter-spacing: 0.5px; text-align: right;
-        }
-        .word-author {
-            font-size: 11px; color: rgba(140,200,255,0.4); letter-spacing: 1px;
-        }
-        .flag { font-size: 14px; }
+        .my-word-time { font-size: 9px; color: rgba(255,255,255,0.18); white-space: nowrap; }
 
+        /* ── States ── */
         .empty-hint {
-            text-align: center; padding: 36px 0;
-            color: rgba(255,255,255,0.14);
-            font-size: 12px; letter-spacing: 2px;
+            padding: 24px 0;
+            color: rgba(255,255,255,0.16);
+            font-size: 11px; letter-spacing: 2px; text-align: center;
         }
-        .loading {
-            text-align: center; padding: 28px 0;
+        .loading-dots {
             color: rgba(255,255,255,0.12);
-            font-size: 11px; letter-spacing: 3px;
+            font-size: 10px; letter-spacing: 4px; text-align: center;
+            padding: 20px 0;
         }
     </style>
 </head>
 <body>
     <header>
         <a href="/">← galaxy</a>
+        <span class="header-sep">/</span>
         <h1>Words</h1>
     </header>
 
     <div class="container">
 
         <!-- 身份 -->
-        <section>
-            <div class="section-title">Your Identity</div>
+        <div class="section">
+            <div class="section-label">Your Identity</div>
             <div class="identity-card">
-                <div class="identity-row">
-                    <div class="name-display" id="name-display">·  ·  ·</div>
-                    <button class="edit-btn" id="edit-name-btn">Edit Name</button>
+                <div class="identity-top">
+                    <div class="avatar" id="avatar-el">·</div>
+                    <div class="name-display" id="name-display">· · ·</div>
+                    <button class="edit-btn" id="edit-name-btn">Edit</button>
                 </div>
-                <div class="identity-sub" id="identity-sub"></div>
+                <div class="identity-meta" id="identity-meta"></div>
 
                 <div class="name-editor" id="name-editor">
                     <div class="name-input-row">
                         <input class="name-input" id="name-input" type="text" maxlength="30"
-                               placeholder="display name (optional)" autocomplete="off" />
+                               placeholder="display name" autocomplete="off" />
                         <button class="save-btn" id="save-name-btn">Save</button>
                     </div>
-                    <div class="name-hint">max 30 chars · visible to all visitors once set</div>
+                    <div class="name-hint">max 30 chars · visible to all visitors</div>
                     <div class="name-msg" id="name-msg"></div>
                 </div>
             </div>
-        </section>
+        </div>
 
         <!-- 我的词 -->
-        <section>
-            <div class="section-title">Your Words</div>
-            <div class="word-list" id="my-word-list">
-                <div class="loading">loading · · ·</div>
+        <div class="section">
+            <div class="section-label">Your Words</div>
+            <div class="my-words" id="my-word-list">
+                <div class="loading-dots">loading · · ·</div>
             </div>
-        </section>
+        </div>
 
         <!-- 全部公开词 -->
-        <section>
-            <div class="section-title">All Words in the Galaxy</div>
-            <div class="word-list" id="all-word-list">
-                <div class="loading">loading · · ·</div>
+        <div class="section">
+            <div class="section-label">All Words in the Galaxy</div>
+            <div class="word-cloud" id="all-word-list">
+                <div class="loading-dots">loading · · ·</div>
             </div>
-        </section>
+        </div>
 
     </div>
 
@@ -221,13 +242,11 @@
         return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
-    /* ── 国旗 emoji ──────────────────────────────────────────────────────── */
     function countryFlag(code) {
         if (!code || code.length !== 2) return '';
         return String.fromCodePoint(...[...code.toUpperCase()].map(c => c.charCodeAt(0) + 127397));
     }
 
-    /* ── 相对时间 ────────────────────────────────────────────────────────── */
     function reltime(ts) {
         const d = Date.now() - new Date(ts).getTime();
         const m = Math.floor(d / 60000), h = Math.floor(d / 3600000), days = Math.floor(d / 86400000);
@@ -242,7 +261,7 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    /* ── 注册访客（若未注册）────────────────────────────────────────────── */
+    /* ── 注册访客 ────────────────────────────────────────────────────────── */
     async function ensureRegistered() {
         if (sessionStorage.getItem('_vis_reg')) return;
         try {
@@ -263,10 +282,7 @@
 
     /* ── 加载本人信息 ────────────────────────────────────────────────────── */
     async function loadMyInfo() {
-        const nameEl = document.getElementById('name-display');
-        const subEl  = document.getElementById('identity-sub');
         let displayName = 'Anonymous', country = '', countryCode = '';
-
         try {
             const res = await fetch(
                 SB_URL + '/rest/v1/visitors?id=eq.' + encodeURIComponent(vid) + '&select=display_name,country,country_code',
@@ -275,21 +291,26 @@
             if (res.ok) {
                 const rows = await res.json();
                 if (rows[0]) {
-                    displayName  = rows[0].display_name || 'Anonymous';
-                    country      = rows[0].country      || '';
-                    countryCode  = rows[0].country_code || '';
+                    displayName = rows[0].display_name || 'Anonymous';
+                    country     = rows[0].country      || '';
+                    countryCode = rows[0].country_code || '';
                 }
             }
         } catch {}
 
-        nameEl.textContent = displayName;
+        document.getElementById('name-display').textContent = displayName;
         document.getElementById('name-input').value = displayName === 'Anonymous' ? '' : displayName;
 
+        // Avatar: first char of name
+        const avatarEl = document.getElementById('avatar-el');
+        avatarEl.textContent = displayName !== 'Anonymous' ? displayName[0].toUpperCase() : '?';
+
         const flag = countryFlag(countryCode);
-        subEl.innerHTML = `
-            <span>ID: ${esc(vid.slice(0, 20))}…</span>
-            ${country ? `<span>${flag} ${esc(country)}</span>` : ''}
-        `;
+        const metaEl = document.getElementById('identity-meta');
+        metaEl.innerHTML = [
+            `<span>${esc(vid.slice(0, 16))}…</span>`,
+            country ? `<span>${flag} ${esc(country)}</span>` : ''
+        ].filter(Boolean).join('');
     }
 
     /* ── 改名面板 ────────────────────────────────────────────────────────── */
@@ -302,10 +323,10 @@
         if (e.key === 'Enter') document.getElementById('save-name-btn').click();
     });
     document.getElementById('save-name-btn').addEventListener('click', async () => {
-        const btn = document.getElementById('save-name-btn');
-        const msg = document.getElementById('name-msg');
+        const btn     = document.getElementById('save-name-btn');
+        const msg     = document.getElementById('name-msg');
         const newName = document.getElementById('name-input').value.trim();
-        btn.disabled = true; msg.textContent = 'saving...';
+        btn.disabled = true; msg.textContent = 'saving…';
         try {
             const res = await fetch(SB_URL + '/rest/v1/rpc/update_visitor_name', {
                 method: 'POST',
@@ -313,7 +334,9 @@
                 body: JSON.stringify({ p_visitor_id: vid, p_token: tok, p_name: newName })
             });
             if (res.ok && await res.json()) {
-                document.getElementById('name-display').textContent = newName || 'Anonymous';
+                const name = newName || 'Anonymous';
+                document.getElementById('name-display').textContent = name;
+                document.getElementById('avatar-el').textContent = name !== 'Anonymous' ? name[0].toUpperCase() : '?';
                 msg.textContent = '✦ saved';
                 setTimeout(() => { msg.textContent = ''; document.getElementById('name-editor').classList.remove('open'); }, 1400);
             } else {
@@ -323,7 +346,7 @@
         btn.disabled = false;
     });
 
-    /* ── 我的词（localStorage + DB 交叉核对审批状态）──────────────────────── */
+    /* ── 我的词 ──────────────────────────────────────────────────────────── */
     async function loadMyWords() {
         const el = document.getElementById('my-word-list');
         let myWords = [], myTimes = {};
@@ -337,7 +360,6 @@
             return;
         }
 
-        // 从 DB 查哪些词已过审
         let approvedSet = new Set();
         try {
             const res = await fetch(
@@ -347,22 +369,18 @@
             if (res.ok) (await res.json()).forEach(r => approvedSet.add(r.word));
         } catch {}
 
-        el.innerHTML = '';
-        myWords.forEach(word => {
+        el.innerHTML = myWords.map(word => {
             const approved = approvedSet.has(word);
-            const ts       = myTimes[word];
-            const card = document.createElement('div');
-            card.className = 'word-card';
-            card.innerHTML = `
-                <div class="word-text">${esc(word)}</div>
-                <div class="word-right">
-                    <span class="status-badge ${approved ? 'status-approved' : 'status-pending'}">
-                        ${approved ? '✓ visible' : '⏳ pending'}
+            const ts = myTimes[word];
+            return `
+                <div class="my-word-row">
+                    <div class="my-word-text">${esc(word)}</div>
+                    <span class="status-pill ${approved ? 'pill-ok' : 'pill-pending'}">
+                        ${approved ? '✓ live' : 'pending'}
                     </span>
-                    ${ts ? `<div class="word-meta">${reltime(ts)}</div>` : ''}
+                    ${ts ? `<div class="my-word-time">${reltime(ts)}</div>` : ''}
                 </div>`;
-            el.appendChild(card);
-        });
+        }).join('');
     }
 
     /* ── 全部公开词 ──────────────────────────────────────────────────────── */
@@ -380,9 +398,8 @@
                 el.innerHTML = '<div class="empty-hint">no words yet</div>'; return;
             }
 
-            // 批量查 visitor 名字和国家
             const vids = [...new Set(words.map(w => w.visitor_id).filter(Boolean))];
-            let visitorMap = {};   // vid → { display_name, country_code }
+            let visitorMap = {};
             if (vids.length > 0) {
                 try {
                     const vRes = await fetch(
@@ -393,25 +410,19 @@
                 } catch {}
             }
 
-            el.innerHTML = '';
-            words.forEach(w => {
+            el.innerHTML = words.map(w => {
                 const v    = visitorMap[w.visitor_id] || {};
-                const name = w.source === 'default'
-                    ? 'system'
-                    : (v.display_name || 'anon·' + (w.visitor_id || '?').slice(-4));
                 const flag = countryFlag(v.country_code);
-                const ts   = w.created_at ? reltime(w.created_at) : '';
-
-                const card = document.createElement('div');
-                card.className = 'word-card';
-                card.innerHTML = `
-                    <div class="word-text">${esc(w.word)}</div>
-                    <div class="word-right">
-                        <div class="word-author">${flag ? flag + ' ' : ''}${esc(name)}</div>
-                        ${ts ? `<div class="word-meta">${ts}</div>` : ''}
+                const name = w.source === 'default' || w.source === 'admin'
+                    ? ''
+                    : (v.display_name || 'anon·' + (w.visitor_id || '?').slice(-4));
+                return `
+                    <div class="word-chip">
+                        ${flag ? `<span class="chip-flag">${flag}</span>` : ''}
+                        <span>${esc(w.word)}</span>
+                        ${name ? `<span class="chip-author">${esc(name)}</span>` : ''}
                     </div>`;
-                el.appendChild(card);
-            });
+            }).join('');
         } catch {
             el.innerHTML = '<div class="empty-hint">could not load · try again later</div>';
         }
