@@ -5,8 +5,7 @@ compatibility_date = "2024-09-23"
 # ── 公开变量（可以写在这里，不需要保密）──────────────────────────────────────
 [vars]
 SUPABASE_URL   = "https://dibqibhjwoogkbdqsrcc.supabase.co"
-ALLOWED_ORIGIN = "https://linzefei.github.io"
-# 如果你用自定义域名，把上面改成 "https://你的域名.com"
+ALLOWED_ORIGIN = "https://linzefei.github.io,https://linzefei.com"
 
 # ── 私密变量（不写在这里！用命令行设置）────────────────────────────────────
 #
