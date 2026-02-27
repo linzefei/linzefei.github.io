@@ -158,18 +158,20 @@
     <div id="stats">
         <div id="particle-count"></div>
         <div id="word-count"></div>
+        <div id="site-version" style="margin-top:4px;opacity:0.6;font-size:10px;letter-spacing:1px;"></div>
     </div>
 
     <div id="word-btn" title="在银河中留下你的词">✦</div>
     <div id="word-panel">
         <p>Leave a word in the galaxy</p>
         <input id="word-input" type="text" maxlength="20" placeholder="your word ..." autocomplete="off" />
-        <!-- Turnstile CAPTCHA（invisible 模式，点击提交时后台静默验证） -->
+        <!-- Turnstile CAPTCHA（interaction-only：正常用户不可见，VPN/异常时弹验证框） -->
         <div id="cf-turnstile"
              class="cf-turnstile"
              data-sitekey="0x4AAAAAACi-7dw4QwkMDret"
              data-theme="dark"
-             data-size="invisible"
+             data-size="flexible"
+             data-appearance="interaction-only"
              data-execution="execute"
              data-callback="onTurnstileToken"
              data-error-callback="onTurnstileError"
@@ -185,6 +187,14 @@
     <script src="js/main.js"></script>
 
     <script>
+    /* ─── 版本号 ─────────────────────────────────────────────────────────── */
+    const SITE_VERSION = 'v0.4.0';
+    console.log('%c Galaxy · linzefei ' + SITE_VERSION, 'background:#000;color:#8cc8ff;font-size:13px;padding:4px 8px;border-radius:4px;');
+    (function() {
+        const el = document.getElementById('site-version');
+        if (el) el.textContent = SITE_VERSION;
+    })();
+
     /* ─── Supabase 常量 ──────────────────────────────────────────────────── */
     const SB_URL  = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
     const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
