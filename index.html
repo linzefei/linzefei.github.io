@@ -171,7 +171,9 @@
              data-theme="dark"
              data-size="invisible"
              data-execution="execute"
-             data-callback="onTurnstileToken">
+             data-callback="onTurnstileToken"
+             data-error-callback="onTurnstileError"
+             data-expired-callback="onTurnstileExpired">
         </div>
         <button id="word-submit">Send to Galaxy</button>
         <div id="word-msg"></div>
@@ -283,9 +285,15 @@
     window.onTurnstileToken = function(token) {
         if (_tsResolve) { _tsResolve(token); _tsResolve = null; }
     };
+    window.onTurnstileError = function() {
+        if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
+    };
+    window.onTurnstileExpired = function() {
+        if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
+    };
     function awaitTurnstile() {
         return new Promise(resolve => {
-            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 15000);
+            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 8000);
             _tsResolve = t => { clearTimeout(tid); resolve(t); };
             const el = document.getElementById('cf-turnstile');
             if (typeof turnstile !== 'undefined') {
@@ -366,6 +374,7 @@
     let queueIndex  = 0;
     let wordScene   = null;
     let wordCamera  = null;
+    const QUEUE_IDX_KEY = '_wq_idx';
 
     // 内置默认词（兜底：数据库未配置时使用）
     const DEFAULT_WORDS = [
@@ -398,6 +407,9 @@
         // 合并：自己的词优先排在前面，去重
         const merged = [...new Set([...myWords, ...(dbWords.length ? dbWords : DEFAULT_WORDS)])];
         wordQueue = merged;
+        // 恢复上次播放序号，防止越界
+        const savedIdx = parseInt(localStorage.getItem(QUEUE_IDX_KEY) || '0', 10);
+        queueIndex = wordQueue.length > 0 ? (isNaN(savedIdx) ? 0 : savedIdx % wordQueue.length) : 0;
         updateWordCount();
     }
 
@@ -410,6 +422,7 @@
             if (!activeWord.isDone()) return;
             activeWord = null;
             queueIndex = (queueIndex + 1) % wordQueue.length;
+            localStorage.setItem(QUEUE_IDX_KEY, queueIndex.toString());
         }
 
         // 启动下一个词
