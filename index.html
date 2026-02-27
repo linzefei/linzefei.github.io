@@ -164,12 +164,14 @@
     <div id="word-panel">
         <p>Leave a word in the galaxy</p>
         <input id="word-input" type="text" maxlength="20" placeholder="your word ..." autocomplete="off" />
-        <!-- Turnstile CAPTCHA widget（compact 模式，暗色主题） -->
+        <!-- Turnstile CAPTCHA（invisible 模式，点击提交时后台静默验证） -->
         <div id="cf-turnstile"
              class="cf-turnstile"
              data-sitekey="0x4AAAAAACi-7dw4QwkMDret"
              data-theme="dark"
-             data-size="compact">
+             data-size="invisible"
+             data-execution="execute"
+             data-callback="onTurnstileToken">
         </div>
         <button id="word-submit">Send to Galaxy</button>
         <div id="word-msg"></div>
@@ -276,20 +278,39 @@
     });
     wordInput.addEventListener('keydown', e => { if (e.key === 'Enter') wordSub.click(); });
 
+    // Turnstile invisible 模式：callback 把 token 交给 Promise
+    let _tsResolve = null;
+    window.onTurnstileToken = function(token) {
+        if (_tsResolve) { _tsResolve(token); _tsResolve = null; }
+    };
+    function awaitTurnstile() {
+        return new Promise(resolve => {
+            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 15000);
+            _tsResolve = t => { clearTimeout(tid); resolve(t); };
+            const el = document.getElementById('cf-turnstile');
+            if (typeof turnstile !== 'undefined') {
+                turnstile.reset(el);
+                turnstile.execute(el);
+            } else {
+                resolve(null);
+            }
+        });
+    }
+
     wordSub.addEventListener('click', async () => {
         const word = wordInput.value.trim();
         if (!word) return;
 
-        // 获取 Turnstile token
-        const tsToken = typeof turnstile !== 'undefined'
-            ? turnstile.getResponse(document.getElementById('cf-turnstile'))
-            : null;
+        wordSub.disabled = true;
+        wordMsg.textContent = 'verifying...';
+
+        const tsToken = await awaitTurnstile();
         if (!tsToken) {
-            wordMsg.textContent = 'please complete verification';
+            wordMsg.textContent = 'verification timeout – try again';
+            wordSub.disabled = false;
             return;
         }
 
-        wordSub.disabled = true;
         wordMsg.textContent = 'sending...';
         try {
             const res = await fetch(WORKER_URL + '/submit-word', {
@@ -300,11 +321,6 @@
             if (res.ok) {
                 wordMsg.textContent = '✦ entering your galaxy...';
                 wordInput.value = '';
-                // Turnstile token 一次性，重置 widget
-                if (typeof turnstile !== 'undefined') {
-                    turnstile.reset(document.getElementById('cf-turnstile'));
-                }
-                // 本人立刻看到：加入队列 + 存入 localStorage
                 saveMyWord(word);
                 wordQueue.unshift(word);
                 updateWordCount();
@@ -316,7 +332,6 @@
                 const err = await res.json().catch(() => ({}));
                 console.error('[word submit] server error:', res.status, err);
                 wordMsg.textContent = err.error === 'captcha failed' ? 'verification failed – try again' : `failed (${res.status}) – try again`;
-                if (typeof turnstile !== 'undefined') turnstile.reset(document.getElementById('cf-turnstile'));
             }
         } catch (err) {
             console.error('[word submit] fetch failed:', err);
