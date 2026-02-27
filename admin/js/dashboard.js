@@ -47,9 +47,9 @@ async function loadOverview() {
         const tags = await (await sb.from('site_tags')).select('id').get();
         document.getElementById('tagsCount').textContent = Array.isArray(tags) ? tags.length : '–';
 
-        // Content items
-        const content = await (await sb.from('site_content')).select('key').get();
-        document.getElementById('contentCount').textContent = Array.isArray(content) ? content.length : '–';
+        // Word count
+        const words = await (await sb.from('visitor_words')).select('id').get();
+        document.getElementById('contentCount').textContent = Array.isArray(words) ? words.length : '–';
 
         // Recent visits table
         await loadRecentVisits();
@@ -163,11 +163,11 @@ function renderPendingWords(words) {
     const el = document.getElementById('pendingWordList');
     if (!words.length) { el.innerHTML = '<div class="empty-state">暂无待审核词</div>'; return; }
     el.innerHTML = words.map(w => `
-        <div class="sortable-item" style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border)">
-            <span class="label" style="flex:1">${escHtml(w.word)}</span>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:default">
+            <span style="flex:1;font-size:13px">${escHtml(w.word)}</span>
             <span style="font-size:11px;color:var(--muted)">${w.source || ''}</span>
-            <button class="btn btn-sm btn-success" onclick="approveWord('${escHtml(w.id)}')">通过</button>
-            <button class="btn btn-sm btn-danger"  onclick="deleteWord('${escHtml(w.id)}')">删除</button>
+            <button class="btn btn-sm btn-success" onclick="approveWord('${w.id}')">通过</button>
+            <button class="btn btn-sm btn-danger"  onclick="deleteWord('${w.id}')">删除</button>
         </div>
     `).join('');
 }
@@ -176,10 +176,10 @@ function renderApprovedWords(words) {
     const el = document.getElementById('approvedWordList');
     if (!words.length) { el.innerHTML = '<div class="empty-state">暂无已通过词</div>'; return; }
     el.innerHTML = words.map(w => `
-        <div class="sortable-item" style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border)">
-            <span class="label" style="flex:1">${escHtml(w.word)}</span>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:default">
+            <span style="flex:1;font-size:13px">${escHtml(w.word)}</span>
             <span style="font-size:11px;color:var(--muted)">${w.source || ''}</span>
-            <button class="btn btn-sm btn-danger" onclick="deleteWord('${escHtml(w.id)}')">删除</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteWord('${w.id}')">删除</button>
         </div>
     `).join('');
 }
