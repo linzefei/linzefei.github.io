@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Galaxy · linzefei</title>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -163,6 +164,13 @@
     <div id="word-panel">
         <p>Leave a word in the galaxy</p>
         <input id="word-input" type="text" maxlength="20" placeholder="your word ..." autocomplete="off" />
+        <!-- Turnstile CAPTCHA widget（compact 模式，暗色主题） -->
+        <div id="cf-turnstile"
+             class="cf-turnstile"
+             data-sitekey="TURNSTILE_SITE_KEY_PLACEHOLDER"
+             data-theme="dark"
+             data-size="compact">
+        </div>
         <button id="word-submit">Send to Galaxy</button>
         <div id="word-msg"></div>
     </div>
@@ -177,6 +185,9 @@
     const SB_URL  = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
     const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
     const SB_HDR  = { 'apikey': SB_ANON, 'Authorization': 'Bearer ' + SB_ANON };
+
+    /* ─── CF Worker 地址（部署 Worker 后填入，占位符期间提交会失败）────────── */
+    const WORKER_URL = 'WORKER_URL_PLACEHOLDER';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -268,17 +279,31 @@
     wordSub.addEventListener('click', async () => {
         const word = wordInput.value.trim();
         if (!word) return;
+
+        // 获取 Turnstile token
+        const tsToken = typeof turnstile !== 'undefined'
+            ? turnstile.getResponse(document.getElementById('cf-turnstile'))
+            : null;
+        if (!tsToken) {
+            wordMsg.textContent = 'please complete verification';
+            return;
+        }
+
         wordSub.disabled = true;
         wordMsg.textContent = 'sending...';
         try {
-            const res = await fetch(SB_URL + '/rest/v1/visitor_words', {
+            const res = await fetch(WORKER_URL + '/submit-word', {
                 method: 'POST',
-                headers: { ...SB_HDR, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-                body: JSON.stringify({ word, visitor_id: vid, source: 'visitor' })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word, visitor_id: vid, turnstile_token: tsToken })
             });
             if (res.ok) {
                 wordMsg.textContent = '✦ entering your galaxy...';
                 wordInput.value = '';
+                // Turnstile token 一次性，重置 widget
+                if (typeof turnstile !== 'undefined') {
+                    turnstile.reset(document.getElementById('cf-turnstile'));
+                }
                 // 本人立刻看到：加入队列 + 存入 localStorage
                 saveMyWord(word);
                 wordQueue.unshift(word);
@@ -288,7 +313,9 @@
                     wordPanel.classList.remove('open');
                 }, 2000);
             } else {
-                wordMsg.textContent = 'failed – try again';
+                const err = await res.json().catch(() => ({}));
+                wordMsg.textContent = err.error === 'captcha failed' ? 'verification failed – try again' : 'failed – try again';
+                if (typeof turnstile !== 'undefined') turnstile.reset(document.getElementById('cf-turnstile'));
             }
         } catch { wordMsg.textContent = 'network error'; }
         wordSub.disabled = false;

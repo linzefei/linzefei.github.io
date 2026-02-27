@@ -16,14 +16,19 @@
 
 ```
 /index.html          主页（粒子动画 + 词墙入口）
-/words.html          词墙页面（访客留词、身份管理）
+/words.html          词墙页面（访客词列表、身份管理）
 /admin/              管理后台（需登录，审核词、管理配置）
 /js/
   config.js          公共常量（SB URL、anon key）
   galaxy.js          星空粒子背景
   main.js            主页逻辑
   wordParticles.js   词墙粒子聚合动画
+/worker/
+  index.js           CF Worker 代码（词提交网关，含 CAPTCHA 验证）
+  wrangler.toml      Worker 部署配置
 ```
+
+> 词提交入口在 `index.html`，`words.html` 只做展示。
 
 ---
 
@@ -61,38 +66,60 @@
 - **service_role key** 绕过 RLS，有它就能读写任何数据，必须只存在服务端
 - 本项目 service_role key **从未提交过 git**，只在 Supabase 控制台和 CF Worker 环境变量里
 
-### 2. 前端直接调 Supabase API 的局限性（已知架构缺陷）
+### 2. 已实施的安全架构：CF Worker + Turnstile
 
-当前 `words.html` 的词提交仍然直接调 Supabase anon API，这有以下风险：
-
-| 风险 | 说明 | 当前状态 |
-|---|---|---|
-| 刷词攻击 | 脚本绕过前端直接 POST，塞满待审队列 | **未解决**，待加 CF Worker |
-| visitor_id 伪造 | 提交时可附任意 visitor_id | 低危，可忽略 |
-| 假国旗 | country 字段由前端从 ip-api.com 查询后传入 | 低危，可忽略 |
-| 脏词昵称 | display_name 无内容过滤 | 低危，管理后台可删 |
-
-### 3. 已规划但未实施：CF Worker + Turnstile
-
-**目标架构**：
+**当前架构**：
 
 ```
 读操作：前端 → Supabase（anon key，受 RLS 保护）
-写操作：前端 → CF Worker（CAPTCHA 验证）→ Supabase（service_role key，藏在 Worker）
+写操作：前端 → CF Worker（Turnstile CAPTCHA 验证）→ Supabase（service_role key，藏在 Worker）
 ```
 
-**实施条件**（待用户完成）：
-1. 注册 Cloudflare 账号（免费）：dash.cloudflare.com
-2. 创建 Turnstile 站点，获取 `site_key`（公开）和 `secret_key`（存 Worker 环境变量）
-3. 从 Supabase → Settings → API 获取 `service_role key`（存 Worker 环境变量）
+**代码位置**：`/worker/index.js` + `/worker/wrangler.toml`
 
-**Worker 逻辑**：
-- 接收 `{ word, visitor_id, turnstile_token }`
-- 服务端验证 CAPTCHA token（调 CF Turnstile API）
-- 验证通过 → 用 service_role key 写 Supabase
-- 失败 → 拒绝，Supabase 完全不知道这次请求
+**Worker 做了什么**：
+1. 接收 `{ word, visitor_id, turnstile_token }`
+2. 用 `TURNSTILE_SECRET`（Worker 环境变量）调 CF API 验证 CAPTCHA token
+3. 验证通过 → 用 `SUPABASE_SERVICE_ROLE`（Worker 环境变量）写 Supabase
+4. 失败 → 返回 403，Supabase 完全不知道这次请求
 
-**同时**：实施后 Supabase 的 `visitor_words` INSERT policy 改为只允许 service_role（即 Worker），anon 不能直接写。
+**剩余风险**（已降低到可接受范围）：
+
+| 风险 | 说明 | 当前状态 |
+|---|---|---|
+| 刷词攻击 | 脚本需过 CAPTCHA | ✅ Turnstile 拦截 |
+| visitor_id 伪造 | 提交时可附任意 visitor_id | 低危，无实际影响 |
+| 假国旗 | country 字段由前端从 ip-api.com 查询后传入 | 低危，可忽略 |
+| 脏词昵称 | display_name 无内容过滤 | 低危，管理后台可删 |
+
+### 3. CF Worker 部署步骤（待用户操作）
+
+**准备 key（在 CF 和 Supabase 控制台获取）**：
+1. CF → Turnstile → 创建站点 → 拿 `site_key`（公开）和 `secret_key`（私密）
+2. Supabase → Project Settings → API → 拿 `service_role` key（私密）
+
+**填入公开 key（修改代码文件）**：
+- `index.html`：把 `TURNSTILE_SITE_KEY_PLACEHOLDER` 换成真实 `site_key`
+- `worker/wrangler.toml`：确认 `ALLOWED_ORIGIN` 与你的域名匹配
+
+**部署 Worker（命令行执行）**：
+```bash
+cd worker
+npx wrangler secret put TURNSTILE_SECRET      # 粘贴 secret_key
+npx wrangler secret put SUPABASE_SERVICE_ROLE # 粘贴 service_role key
+npx wrangler deploy
+```
+
+**填入 Worker URL（修改代码文件）**：
+- 部署成功后拿到 Worker URL（格式：`https://linzefei-word-worker.xxx.workers.dev`）
+- 把 `index.html` 中的 `WORKER_URL_PLACEHOLDER` 换成真实 URL
+
+**更新 Supabase RLS（防止绕过 Worker 直接写）**：
+```sql
+-- 删除 anon 直接写的权限，只允许 Worker（service_role）写
+DROP POLICY IF EXISTS "anon insert words" ON visitor_words;
+-- 不需要新建，service_role 天然绕过 RLS
+```
 
 ### 4. 不要 hardcode 任何 secret
 
@@ -155,5 +182,5 @@
 |---|---|---|
 | 后端 | 无（静态站） | GitHub Pages 免费，个人博客不需要服务器 |
 | 数据库 | Supabase | 免费 tier 够用，RLS 提供基本安全，Realtime 支持 |
-| CAPTCHA | Cloudflare Turnstile（计划中） | 免费、无感知、无需 Google 账号 |
-| Worker | Cloudflare Workers（计划中） | 免费 10w 请求/天，edge 节点快，环境变量安全存 key |
+| CAPTCHA | Cloudflare Turnstile | 免费、无感知、无需 Google 账号 |
+| Worker | Cloudflare Workers | 免费 10w 请求/天，edge 节点快，环境变量安全存 key |
