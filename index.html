@@ -368,11 +368,11 @@
             } else {
                 const err = await res.json().catch(() => ({}));
                 console.error('[word submit] server error:', res.status, err);
-                wordMsg.textContent = err.error === 'captcha failed' ? 'verification failed – try again' : `failed (${res.status}) – try again`;
+                wordMsg.textContent = `[${res.status}] ${err.error || 'server error'}`;
             }
         } catch (err) {
             console.error('[word submit] fetch failed:', err);
-            wordMsg.textContent = 'network error – see console (F12)';
+            wordMsg.textContent = 'net err: ' + (err.message || String(err));
         }
         wordSub.disabled = false;
     });
