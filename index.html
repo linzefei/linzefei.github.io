@@ -314,10 +314,14 @@
                 }, 2000);
             } else {
                 const err = await res.json().catch(() => ({}));
-                wordMsg.textContent = err.error === 'captcha failed' ? 'verification failed – try again' : 'failed – try again';
+                console.error('[word submit] server error:', res.status, err);
+                wordMsg.textContent = err.error === 'captcha failed' ? 'verification failed – try again' : `failed (${res.status}) – try again`;
                 if (typeof turnstile !== 'undefined') turnstile.reset(document.getElementById('cf-turnstile'));
             }
-        } catch { wordMsg.textContent = 'network error'; }
+        } catch (err) {
+            console.error('[word submit] fetch failed:', err);
+            wordMsg.textContent = 'network error – see console (F12)';
+        }
         wordSub.disabled = false;
     });
 
