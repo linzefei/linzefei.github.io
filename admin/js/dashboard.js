@@ -47,9 +47,9 @@ async function loadOverview() {
         const tags = await (await sb.from('site_tags')).select('id').get();
         document.getElementById('tagsCount').textContent = Array.isArray(tags) ? tags.length : '–';
 
-        // Content items
-        const content = await (await sb.from('site_content')).select('key').get();
-        document.getElementById('contentCount').textContent = Array.isArray(content) ? content.length : '–';
+        // Word count
+        const words = await (await sb.from('visitor_words')).select('id').get();
+        document.getElementById('contentCount').textContent = Array.isArray(words) ? words.length : '–';
 
         // Recent visits table
         await loadRecentVisits();
@@ -145,83 +145,80 @@ function renderChart(barsId, labelsId, labels, counts) {
 /* ─── Content tab ──────────────────────────────────────────── */
 async function loadContent() {
     try {
-        const qb = await sb.from('site_content');
-        const rows = await qb.select('*').get();
-        let order = ['Hello World!', 'Three.js', 'JavaScript', 'Python', 'Java', 'C++', 'React', 'Vue', 'Angular', 'Node.js', 'linzefei', 'Cursor', '2025'];
-
-        if (Array.isArray(rows)) {
-            const row = rows.find(r => r.key === 'display_order');
-            if (row?.value) {
-                try { order = JSON.parse(typeof row.value === 'string' ? row.value : JSON.stringify(row.value)); } catch {}
-            }
-        }
-
-        renderSortable(order);
+        const qb = await sb.from('visitor_words');
+        const rows = await qb.select('id,word,approved,source,created_at').order('created_at', { ascending: false }).limit(200).get();
+        const words = Array.isArray(rows) ? rows : [];
+        const pending  = words.filter(w => !w.approved);
+        const approved = words.filter(w =>  w.approved);
+        renderPendingWords(pending);
+        renderApprovedWords(approved);
     } catch (e) {
         console.warn('Content load error:', e);
-        renderSortable(['Hello World!', 'Three.js', 'JavaScript', 'Python', 'Java', 'C++', 'React', 'Vue', 'Angular', 'Node.js', 'linzefei', 'Cursor', '2025']);
+        document.getElementById('pendingWordList').innerHTML  = '<div class="empty-state">加载失败</div>';
+        document.getElementById('approvedWordList').innerHTML = '<div class="empty-state">加载失败</div>';
     }
 }
 
-function renderSortable(items) {
-    const list = document.getElementById('sortableList');
-    list.innerHTML = items.map((item, i) => `
-        <li class="sortable-item" draggable="true" data-index="${i}">
-            <span class="handle">⠿</span>
-            <span class="label">${escHtml(item)}</span>
-            <div class="actions">
-                <button class="btn btn-sm btn-danger" onclick="removeContentItem(${i})">删除</button>
-            </div>
-        </li>
+function renderPendingWords(words) {
+    const el = document.getElementById('pendingWordList');
+    if (!words.length) { el.innerHTML = '<div class="empty-state">暂无待审核词</div>'; return; }
+    el.innerHTML = words.map(w => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:default">
+            <span style="flex:1;font-size:13px">${escHtml(w.word)}</span>
+            <span style="font-size:11px;color:var(--muted)">${w.source || ''}</span>
+            <button class="btn btn-sm btn-success" onclick="approveWord('${w.id}')">通过</button>
+            <button class="btn btn-sm btn-danger"  onclick="deleteWord('${w.id}')">删除</button>
+        </div>
     `).join('');
-    initDragSort(list);
 }
 
-function initDragSort(list) {
-    let dragging = null;
-    list.querySelectorAll('[draggable]').forEach(item => {
-        item.addEventListener('dragstart', () => { dragging = item; item.style.opacity = '.4'; });
-        item.addEventListener('dragend',   () => { item.style.opacity = ''; dragging = null; });
-        item.addEventListener('dragover',  e => {
-            e.preventDefault();
-            if (dragging && dragging !== item) {
-                const rect = item.getBoundingClientRect();
-                const after = e.clientY > rect.top + rect.height / 2;
-                if (after) item.after(dragging);
-                else item.before(dragging);
-            }
-        });
-    });
+function renderApprovedWords(words) {
+    const el = document.getElementById('approvedWordList');
+    if (!words.length) { el.innerHTML = '<div class="empty-state">暂无已通过词</div>'; return; }
+    el.innerHTML = words.map(w => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--border);cursor:default">
+            <span style="flex:1;font-size:13px">${escHtml(w.word)}</span>
+            <span style="font-size:11px;color:var(--muted)">${w.source || ''}</span>
+            <button class="btn btn-sm btn-danger" onclick="deleteWord('${w.id}')">删除</button>
+        </div>
+    `).join('');
 }
 
-function getContentOrder() {
-    return [...document.querySelectorAll('#sortableList .sortable-item .label')].map(el => el.textContent);
+async function approveWord(id) {
+    try {
+        const qb = await sb.from('visitor_words');
+        await qb.eq('id', id).update({ approved: true });
+        toast('已通过', 'ok');
+        loadContent();
+    } catch (e) {
+        toast('操作失败: ' + e.message, 'fail');
+    }
 }
 
-function removeContentItem(idx) {
-    const items = getContentOrder();
-    items.splice(idx, 1);
-    renderSortable(items);
+async function deleteWord(id) {
+    if (!confirm('确认删除这个词？')) return;
+    try {
+        const qb = await sb.from('visitor_words');
+        await qb.eq('id', id).delete();
+        toast('已删除', 'ok');
+        loadContent();
+    } catch (e) {
+        toast('删除失败: ' + e.message, 'fail');
+    }
 }
 
-function addContentItem() {
+async function addContentItem() {
     const inp = document.getElementById('newContentItem');
     const val = inp.value.trim();
     if (!val) return;
-    const items = getContentOrder();
-    items.push(val);
-    renderSortable(items);
-    inp.value = '';
-}
-
-async function saveContent() {
-    const order = getContentOrder();
     try {
-        const qb = await sb.from('site_content');
-        await qb.upsert({ key: 'display_order', value: JSON.stringify(order), updated_at: new Date().toISOString() });
-        toast('内容已保存', 'ok');
+        const qb = await sb.from('visitor_words');
+        await qb.insert({ word: val, approved: true, source: 'admin' });
+        inp.value = '';
+        toast('词已添加', 'ok');
+        loadContent();
     } catch (e) {
-        toast('保存失败: ' + e.message, 'fail');
+        toast('添加失败: ' + e.message, 'fail');
     }
 }
 
@@ -278,32 +275,6 @@ async function deleteTag(id) {
         loadTags();
     } catch (e) {
         toast('删除失败: ' + e.message, 'fail');
-    }
-}
-
-/* ─── Settings ─────────────────────────────────────────────── */
-async function changePassword() {
-    const np = document.getElementById('newPass').value;
-    const cp = document.getElementById('confirmPass').value;
-    if (!np) { toast('请输入新密码', 'fail'); return; }
-    if (np !== cp) { toast('两次密码不一致', 'fail'); return; }
-    if (np.length < 8) { toast('密码至少8位', 'fail'); return; }
-    try {
-        const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON,
-                'Authorization': 'Bearer ' + sb._session.access_token
-            },
-            body: JSON.stringify({ password: np })
-        });
-        if (!res.ok) throw new Error((await res.json()).msg || 'Failed');
-        document.getElementById('newPass').value = '';
-        document.getElementById('confirmPass').value = '';
-        toast('密码已修改', 'ok');
-    } catch (e) {
-        toast('修改失败: ' + e.message, 'fail');
     }
 }
 

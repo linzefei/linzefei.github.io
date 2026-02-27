@@ -256,11 +256,11 @@ class Galaxy {
         canvas.width = 256; canvas.height = 256;
         const ctx = canvas.getContext('2d');
         const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-        grad.addColorStop(0,    'rgba(255, 230, 160, 1)');
-        grad.addColorStop(0.04, 'rgba(255, 210, 120, 0.95)');
-        grad.addColorStop(0.12, 'rgba(255, 180,  80, 0.7)');
-        grad.addColorStop(0.30, 'rgba(255, 140,  40, 0.3)');
-        grad.addColorStop(0.65, 'rgba(200,  80,  20, 0.08)');
+        grad.addColorStop(0,    'rgba(255, 230, 160, 0.45)');
+        grad.addColorStop(0.04, 'rgba(255, 210, 120, 0.38)');
+        grad.addColorStop(0.12, 'rgba(255, 180,  80, 0.25)');
+        grad.addColorStop(0.30, 'rgba(255, 140,  40, 0.1)');
+        grad.addColorStop(0.65, 'rgba(200,  80,  20, 0.03)');
         grad.addColorStop(1,    'rgba(0,0,0,0)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 256, 256);

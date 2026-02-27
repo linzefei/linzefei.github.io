@@ -68,9 +68,9 @@
             <div class="stat-sub">已配置</div>
           </div>
           <div class="card">
-            <div class="card-title">内容条目</div>
+            <div class="card-title">词条总数</div>
             <div class="stat-num" id="contentCount">–</div>
-            <div class="stat-sub">数据库记录</div>
+            <div class="stat-sub">visitor_words</div>
           </div>
         </div>
 
@@ -124,18 +124,21 @@
 
       <!-- ── 内容管理 ────────────────────────────────────────── -->
       <div class="tab-panel" id="tab-content">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <span class="card-title">待审核词</span>
+            <button class="btn btn-ghost btn-sm" onclick="loadContent()">刷新</button>
+          </div>
+          <div id="pendingWordList"><div class="empty-state">加载中…</div></div>
+        </div>
         <div class="card">
           <div class="card-header">
-            <span class="card-title">星系文字标签顺序（由内到外）</span>
-            <button class="btn btn-success btn-sm" onclick="saveContent()">保存</button>
+            <span class="card-title">已通过词</span>
           </div>
-          <p style="font-size:12px;color:var(--muted);margin-bottom:16px">拖拽排序，首个文字显示在星系核心，最后一个在最外层轨道</p>
-          <ul class="sortable-list" id="sortableList">
-            <li class="empty-state">加载中…</li>
-          </ul>
+          <div id="approvedWordList"><div class="empty-state">加载中…</div></div>
           <hr class="divider">
           <div class="input-row">
-            <input type="text" id="newContentItem" placeholder="添加新文字（如 Docker）" maxlength="30">
+            <input type="text" id="newContentItem" placeholder="直接添加词（如 Docker）" maxlength="30">
             <button class="btn btn-primary btn-sm" onclick="addContentItem()">添加</button>
           </div>
         </div>
@@ -161,26 +164,9 @@
       <!-- ── 设置 ───────────────────────────────────────────── -->
       <div class="tab-panel" id="tab-settings">
         <div class="card" style="max-width:480px">
-          <div class="card-header"><span class="card-title">修改密码</span></div>
-          <div class="form-group">
-            <label>新密码</label>
-            <div class="inline-form">
-              <input type="password" id="newPass" placeholder="至少 8 位">
-            </div>
-          </div>
-          <div class="form-group">
-            <label>确认新密码</label>
-            <div class="inline-form">
-              <input type="password" id="confirmPass" placeholder="再次输入">
-            </div>
-          </div>
-          <button class="btn btn-primary btn-sm" onclick="changePassword()">确认修改</button>
-        </div>
-
-        <div class="card" style="max-width:480px;margin-top:16px">
           <div class="card-header"><span class="card-title">账号信息</span></div>
-          <p style="font-size:13px;color:var(--muted)">邮箱：<span id="settingEmail" style="color:var(--text)"></span></p>
-          <p style="font-size:12px;color:var(--muted);margin-top:8px">如需找回密码，请联系 Supabase 后台重置</p>
+          <p style="font-size:13px;color:var(--muted)">登录方式：<span style="color:var(--text)">GitHub OAuth</span></p>
+          <p style="font-size:13px;color:var(--muted);margin-top:8px">邮箱：<span id="settingEmail" style="color:var(--text)"></span></p>
         </div>
       </div>
 
