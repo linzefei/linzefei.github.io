@@ -290,20 +290,32 @@
     });
     wordInput.addEventListener('keydown', e => { if (e.key === 'Enter') wordSub.click(); });
 
-    // Turnstile invisible 模式：callback 把 token 交给 Promise
+    // Turnstile 回调：缓存 token，超时后点击的 token 也不丢失
     let _tsResolve = null;
+    let _tsCachedToken = null;
+    let _tsCachedAt = 0;
+    const _TS_TTL = 240000; // 4 分钟（token 5 分钟过期，留 1 分钟余量）
+
     window.onTurnstileToken = function(token) {
+        _tsCachedToken = token;
+        _tsCachedAt = Date.now();
         if (_tsResolve) { _tsResolve(token); _tsResolve = null; }
     };
     window.onTurnstileError = function() {
         if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
     };
     window.onTurnstileExpired = function() {
+        _tsCachedToken = null;
         if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
     };
     function awaitTurnstile() {
+        // 有缓存的新鲜 token（上次超时后用户点击验证框获得的）直接复用
+        if (_tsCachedToken && Date.now() - _tsCachedAt < _TS_TTL) {
+            const t = _tsCachedToken; _tsCachedToken = null;
+            return Promise.resolve(t);
+        }
         return new Promise(resolve => {
-            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 8000);
+            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 45000);
             _tsResolve = t => { clearTimeout(tid); resolve(t); };
             const el = document.getElementById('cf-turnstile');
             if (typeof turnstile !== 'undefined') {
@@ -322,9 +334,16 @@
         wordSub.disabled = true;
         wordMsg.textContent = 'verifying...';
 
+        // 超过 4s 仍未获得 token，提示用户找验证框点击
+        const hintTimer = setTimeout(() => {
+            if (wordSub.disabled) wordMsg.textContent = 'click the verification box above ↑';
+        }, 4000);
+
         const tsToken = await awaitTurnstile();
+        clearTimeout(hintTimer);
+
         if (!tsToken) {
-            wordMsg.textContent = 'verification timeout – try again';
+            wordMsg.textContent = 'verification failed – try again';
             wordSub.disabled = false;
             return;
         }
