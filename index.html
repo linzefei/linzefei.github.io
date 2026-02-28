@@ -336,6 +336,26 @@
         if (!word) return;
 
         wordSub.disabled = true;
+        wordMsg.textContent = 'checking...';
+
+        // 检查词是否已存在（查询已审核通过的公开词）
+        try {
+            const checkRes = await fetch(SB_URL + '/rest/v1/visitor_words?word=eq.' + encodeURIComponent(word) + '&approved=eq.true&select=word', {
+                headers: SB_HDR
+            });
+            if (checkRes.ok) {
+                const existing = await checkRes.json();
+                if (existing.length > 0) {
+                    wordMsg.textContent = '✦ this word already exists in the galaxy';
+                    wordSub.disabled = false;
+                    return;
+                }
+            }
+        } catch (err) {
+            console.warn('[word check] failed:', err);
+            // 查询失败不阻止提交，继续走后续流程
+        }
+
         wordMsg.textContent = 'verifying...';
 
         // 超过 4s 仍未获得 token，提示用户找验证框点击
