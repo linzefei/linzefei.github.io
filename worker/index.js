@@ -93,9 +93,9 @@ async function handleSubmitWord(request, env, origin) {
 }
 
 function corsResponse(body, status, origin, env) {
-  // 调试模式：临时允许所有来源，确认 Worker 本身是否可达
-  // TODO: 验证通过后改回严格模式（检查 ALLOWED_ORIGIN 白名单）
-  const allow = origin || '*';
+  const allowed = (env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim());
+  // 若 origin 在白名单内则精确匹配，否则回退 *（含 origin=null 等非法值）
+  const allow = (origin && allowed.includes(origin)) ? origin : '*';
 
   return new Response(body, {
     status,
