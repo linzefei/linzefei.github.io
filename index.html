@@ -338,9 +338,9 @@
         wordSub.disabled = true;
         wordMsg.textContent = 'checking...';
 
-        // 检查词是否已存在（查询已审核通过的公开词）
+        // 检查词是否已存在（查询已审核通过的公开词，不区分大小写）
         try {
-            const checkRes = await fetch(SB_URL + '/rest/v1/visitor_words?word=eq.' + encodeURIComponent(word) + '&approved=eq.true&select=word', {
+            const checkRes = await fetch(SB_URL + '/rest/v1/visitor_words?word=ilike.' + encodeURIComponent(word) + '&approved=eq.true&select=word', {
                 headers: SB_HDR
             });
             if (checkRes.ok) {
