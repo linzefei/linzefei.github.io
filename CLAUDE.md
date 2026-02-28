@@ -176,6 +176,27 @@ DROP POLICY IF EXISTS "anon insert words" ON visitor_words;
 
 ---
 
+## 当前待办（新会话接手从这里开始）
+
+### Worker CORS bug — 已修复，待部署
+
+**问题**：Turnstile 挑战触发跨域重定向后，浏览器发送 `Origin: null`，
+旧代码直接 echo 导致 `Access-Control-Allow-Origin: null`，浏览器拒绝 preflight。
+
+**已修复**：`worker/index.js` `corsResponse()` 现在对比白名单，
+不在白名单内（含 null）统一返回 `*`。代码在分支 `claude/check-repo-status-YeitL`。
+
+**下一步（在本地终端执行）**：
+```bash
+git pull origin claude/check-repo-status-YeitL
+cd worker
+CLOUDFLARE_API_TOKEN=<你的token> npx wrangler deploy
+```
+
+部署后访问 https://linzefei.com 测试词提交是否正常。
+
+---
+
 ## 技术选型说明
 
 | 选项 | 选择 | 原因 |

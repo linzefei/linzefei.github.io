@@ -315,8 +315,12 @@
             return Promise.resolve(t);
         }
         return new Promise(resolve => {
-            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 45000);
+            // 15s 超时（原来 45s 太长）
+            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 15000);
             _tsResolve = t => { clearTimeout(tid); resolve(t); };
+            // 网络恢复时立即放弃等待，让用户重试
+            const onOnline = () => { clearTimeout(tid); _tsResolve = null; resolve(null); };
+            window.addEventListener('online', onOnline, { once: true });
             const el = document.getElementById('cf-turnstile');
             if (typeof turnstile !== 'undefined') {
                 turnstile.reset(el);
