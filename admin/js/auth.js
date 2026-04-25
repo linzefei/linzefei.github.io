@@ -1,6 +1,7 @@
 /* ─── Supabase config ─────────────────────────────────────── */
-const SUPABASE_URL = 'https://dibqibhjwoogkbdqsrcc.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
+// Use global SB_URL and SB_ANON from api-config.js if available, otherwise fallback
+const SUPABASE_URL = typeof SB_URL !== 'undefined' ? SB_URL : 'https://dibqibhjwoogkbdqsrcc.supabase.co';
+const SUPABASE_ANON = typeof SB_ANON !== 'undefined' ? SB_ANON : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpYnFpYmhqd29vZ2tiZHFzcmNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMjMzNDQsImV4cCI6MjA4NzY5OTM0NH0.Wnvd9RC8kTyQQMrZcQvI2AQBoeja0nMbxKxhJwytIbI';
 
 /* ─── Supabase lightweight client ─────────────────────────── */
 class SupabaseClient {

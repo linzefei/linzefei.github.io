@@ -78,14 +78,14 @@ create table if not exists visitor_words (
   sort_order  int         default 999     -- 默认词按此排序，游客词按时间
 );
 
-alter table visitor_words enable row level security;
+-- alter table visitor_words enable row level security;
 
 drop policy if exists "anon insert words"    on visitor_words;
 drop policy if exists "anon select approved" on visitor_words;
 drop policy if exists "auth all words"       on visitor_words;
 
-create policy "anon insert words" on visitor_words
-  for insert to anon with check (true);
+-- create policy "anon insert words" on visitor_words
+--   for insert to anon with check (true);
 
 create policy "anon select approved" on visitor_words
   for select to anon using (approved = true);

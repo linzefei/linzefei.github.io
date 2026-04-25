@@ -256,11 +256,11 @@ class Galaxy {
         canvas.width = 256; canvas.height = 256;
         const ctx = canvas.getContext('2d');
         const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-        grad.addColorStop(0,    'rgba(255, 230, 160, 0.45)');
-        grad.addColorStop(0.04, 'rgba(255, 210, 120, 0.38)');
-        grad.addColorStop(0.12, 'rgba(255, 180,  80, 0.25)');
-        grad.addColorStop(0.30, 'rgba(255, 140,  40, 0.1)');
-        grad.addColorStop(0.65, 'rgba(200,  80,  20, 0.03)');
+        grad.addColorStop(0,    'rgba(200, 100, 255, 0.45)');
+        grad.addColorStop(0.04, 'rgba(160, 80,  255, 0.38)');
+        grad.addColorStop(0.12, 'rgba(100, 50,  255, 0.25)');
+        grad.addColorStop(0.30, 'rgba(50,  150, 255, 0.1)');
+        grad.addColorStop(0.65, 'rgba(20,  100, 200, 0.03)');
         grad.addColorStop(1,    'rgba(0,0,0,0)');
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, 256, 256);
@@ -358,6 +358,41 @@ class Galaxy {
         }
     }
 
+    // ── 3D Shockwave ─────────────────────────────────────────────────────────
+    _spawnShockwave() {
+        const geo = new THREE.RingGeometry(1, 15, 64);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x88ddff,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.x = Math.PI / 2; // 平放
+        this.group.add(mesh);
+        
+        if (!this.shockwaves) this.shockwaves = [];
+        this.shockwaves.push({ mesh, life: 1.0 });
+    }
+
+    _updateShockwaves() {
+        if (!this.shockwaves) return;
+        for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+            const sw = this.shockwaves[i];
+            sw.life -= 0.02;
+            sw.mesh.scale.addScalar(20); // 迅速扩散
+            sw.mesh.material.opacity = Math.max(0, sw.life * 0.8);
+            if (sw.life <= 0) {
+                this.group.remove(sw.mesh);
+                sw.mesh.geometry.dispose();
+                sw.mesh.material.dispose();
+                this.shockwaves.splice(i, 1);
+            }
+        }
+    }
+
     update() {
         this.time += 0.016;
 
@@ -377,6 +412,18 @@ class Galaxy {
             this._spawnShootingStar();
         }
         this._updateShootingStars();
+        this._updateShockwaves();
+    }
+
+    dispose() {
+        this.group.children.forEach(c => {
+            if (c.geometry) c.geometry.dispose();
+            if (c.material) c.material.dispose();
+        });
+        this.scene.remove(this.group);
+    }
+}
+ars();
     }
 
     dispose() {

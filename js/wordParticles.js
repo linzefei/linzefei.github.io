@@ -203,10 +203,19 @@ class WordParticles {
             const ease = t * t;  // easeInQuad
             this.mat.opacity = 0.92 * (1 - t);
 
+            // 爆散时也加入螺旋离心力
+            const angle = ease * Math.PI * 1.5;
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
+
             for (let i = 0; i < this.n; i++) {
-                pos[i*3]   = this.target[i*3]   + (this.explode[i*3]   - this.target[i*3])   * ease;
-                pos[i*3+1] = this.target[i*3+1] + (this.explode[i*3+1] - this.target[i*3+1]) * ease;
-                pos[i*3+2] = this.target[i*3+2] + (this.explode[i*3+2] - this.target[i*3+2]) * ease;
+                const currentX = this.target[i*3]   + (this.explode[i*3]   - this.target[i*3])   * ease;
+                const currentY = this.target[i*3+1] + (this.explode[i*3+1] - this.target[i*3+1]) * ease;
+                const currentZ = this.target[i*3+2] + (this.explode[i*3+2] - this.target[i*3+2]) * ease;
+
+                pos[i*3]   = currentX * cosA - currentZ * sinA;
+                pos[i*3+1] = currentY;
+                pos[i*3+2] = currentX * sinA + currentZ * cosA;
             }
             this.geo.attributes.position.needsUpdate = true;
 
@@ -236,6 +245,12 @@ class WordParticles {
         // 把 target 设为当前位置
         for (let i = 0; i < this.n * 3; i++) {
             this.target[i] = this.cur[i];
+        }
+        this.phase = 'dispersing';
+        this.tick  = 0;
+    }
+}
+];
         }
         this.phase = 'dispersing';
         this.tick  = 0;

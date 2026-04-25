@@ -2,7 +2,13 @@ if (typeof THREE === 'undefined') {
     throw new Error('Three.js not loaded');
 }
 
-let scene, camera, renderer, controls, galaxy, clock;
+let scene, camera, renderer, composer, controls, galaxy, clock;
+
+// 视差参数 (Parallax)
+let mouseX = 0;
+let mouseY = 0;
+let targetX = 0;
+let targetY = 0;
 
 function init() {
     // Scene
@@ -22,6 +28,17 @@ function init() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     document.body.appendChild(renderer.domElement);
 
+    // ── 后期处理与辉光 (Bloom) ───────────────────────────────────────────────
+    const renderScene = new THREE.RenderPass(scene, camera);
+    
+    // 参数: 分辨率, strength (强度), radius (半径), threshold (阈值)
+    // 阈值设为 0.15 保证暗弱背景星不发光，只有高亮的文字、流星和星系核心发光
+    const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.15);
+    
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(renderScene);
+    composer.addPass(bloomPass);
+
     // Controls
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping  = true;
@@ -36,6 +53,13 @@ function init() {
     controls.addEventListener('start', () => { controls.autoRotate = false; });
     controls.addEventListener('end',   () => {
         setTimeout(() => { controls.autoRotate = true; }, 3500);
+    });
+
+    // ── 鼠标视差监听 (Mouse Parallax) ────────────────────────────────────────
+    window.addEventListener('mousemove', (event) => {
+        // 归一化鼠标坐标 [-1, 1]
+        mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+        mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
     });
 
     // Galaxy
@@ -58,14 +82,24 @@ function onResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (composer) composer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function animate() {
     requestAnimationFrame(animate);
+
+    // ── 视差运算：给 scene 施加平滑偏移 ──────────────────────────────────────
+    targetX = mouseX * 40;  // 偏移幅度系数
+    targetY = mouseY * 40;
+    scene.position.x += (targetX - scene.position.x) * 0.05; // 缓动插值
+    scene.position.y += (targetY - scene.position.y) * 0.05;
+
     galaxy.update();
     controls.update();
     if (typeof window._wordTick === 'function') window._wordTick();
-    renderer.render(scene, camera);
+    
+    // 使用 composer 替代 renderer
+    composer.render();
 }
 
 window.addEventListener('load', () => {
