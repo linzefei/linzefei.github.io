@@ -252,19 +252,13 @@
         }).catch(() => {});
     })();
 
-    /* ─── Click ripple + shooting star ──────────────────────────────────── */
+    /* ─── Click vibration + shooting star ───────────────────────────────── */
     document.addEventListener('click', function(e) {
         if (e.target.closest('#word-panel') || e.target.id === 'word-btn') return;
-        // 保留轻微的 2D 水波纹反馈
-        const div = document.createElement('div');
-        div.className = 'ripple';
-        div.style.cssText = `left:${e.clientX}px;top:${e.clientY}px;width:0;height:0`;
-        document.body.appendChild(div);
-        setTimeout(() => div.remove(), 950);
-
+        
         if (typeof galaxy !== 'undefined' && galaxy) {
-            // 触发 3D 星系震荡波
-            if (galaxy._spawnShockwave) galaxy._spawnShockwave();
+            // 触发空间震动（所有粒子颤动）
+            if (galaxy.triggerVibration) galaxy.triggerVibration();
 
             const n = 2 + Math.floor(Math.random() * 3);
             for (let i = 0; i < n; i++) setTimeout(() => galaxy._spawnShootingStar(), i * 80);
