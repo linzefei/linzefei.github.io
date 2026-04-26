@@ -1,24 +1,23 @@
 // Galaxy Configuration
 const GALAXY_CONFIG = {
     particles: {
-        disk:       55000,   // Main spiral disk
-        core:       18000,   // Dense central bulge
-        halo:        4000,   // Stellar halo (spherical)
-        nebula:      6000,   // Nebula cloud patches
-        background: 12000,   // Distant background stars
-    },
-    arms: {
-        count:         4,    // Number of spiral arms
-        windingFactor: 1.0,  // How tightly wound (higher = more turns)
-        spread:        0.40, // Angular scatter around each arm
+        disk:       32000,   // 原 55000，适当减量以节省显存
+        core:       8000,    // 原 18000
+        halo:       2000,    // 原 4000
+        background: 3000,    // 星空背景
+        nebula:     1200,    // 气体星云
     },
     size: {
-        diskRadius: 560,     // Outer edge of disk (units)
-        coreRadius:  55,     // Core/bulge radius
-        haloRadius: 900,     // Outer edge of halo
+        diskRadius: 500,
+        coreRadius: 40,
+    },
+    arms: {
+        count: 3,
+        windingFactor: 0.8,
+        spread: 0.35,
     },
     rotation: {
-        disk:  0.000095,     // Galaxy rotation speed (rad/frame)
+        disk:  0.000095,
     },
     camera: {
         fov:  60,
