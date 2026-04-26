@@ -1,11 +1,11 @@
-// Galaxy Configuration
+// Galaxy Configuration - Safe Mode
 const GALAXY_CONFIG = {
     particles: {
-        disk:       32000,   // 原 55000，适当减量以节省显存
-        core:       8000,    // 原 18000
-        halo:       2000,    // 原 4000
-        background: 3000,    // 星空背景
-        nebula:     1200,    // 气体星云
+        disk:       12000,   // 大幅削减
+        core:       3000,    
+        halo:       1000,    
+        background: 2000,    
+        nebula:     600,     
     },
     size: {
         diskRadius: 500,
@@ -17,12 +17,12 @@ const GALAXY_CONFIG = {
         spread: 0.35,
     },
     rotation: {
-        disk:  0.000095,
+        disk:  0.00012, // 稍微快一点点，让灵动感补足数量
     },
     camera: {
         fov:  60,
-        near: 0.1,
-        far:  8000,
+        near: 1,
+        far:  5000,
         position: { x: 0, y: 520, z: 980 },
     },
 };
