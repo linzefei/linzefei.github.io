@@ -57,9 +57,9 @@ class WordParticles {
             this.startP[i*3] = Math.cos(th) * r; this.startP[i*3+1] = (Math.random() - 0.5) * 30; this.startP[i*3+2] = Math.sin(th) * r * 0.35;
             this.cur[i*3] = this.startP[i*3]; this.cur[i*3+1] = this.startP[i*3+1]; this.cur[i*3+2] = this.startP[i*3+2];
             const t = Math.random();
-            if (t < 0.55) { colors[i*3]=0.5; colors[i*3+1]=0.8; colors[i*3+2]=1.0; }
-            else if (t < 0.8) { colors[i*3]=colors[i*3+1]=colors[i*3+2]=0.9; }
-            else { colors[i*3]=1.0; colors[i*3+1]=0.6; colors[i*3+2]=0.2; }
+            if (t < 0.55) { colors[i*3]=0.6; colors[i*3+1]=0.9; colors[i*3+2]=1.0; }
+            else if (t < 0.8) { colors[i*3]=colors[i*3+1]=colors[i*3+2]=1.0; }
+            else { colors[i*3]=1.0; colors[i*3+1]=0.7; colors[i*3+2]=0.3; }
         });
         this.delay = new Float32Array(this.n);
         for (let i=0; i<this.n; i++) this.delay[i] = Math.random() * 0.4;
@@ -122,6 +122,11 @@ class WordParticles {
             }
             this.geo.attributes.position.needsUpdate = true;
             if (t >= 1) { this.scene.remove(this.points); this.geo.dispose(); this.mat.dispose(); this.phase = 'done'; }
+        }
+    }
+    isDone() { return this.phase === 'done'; }
+}
+t.dispose(); this.phase = 'done'; }
         }
     }
     isDone() { return this.phase === 'done'; }

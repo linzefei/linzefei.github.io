@@ -278,8 +278,9 @@ class Galaxy {
     }
 
     _spawnShockwave() {
-        const geo = new THREE.RingGeometry(1, 15, 64);
-        const mat = new THREE.MeshBasicMaterial({ color: 0x88ddff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+        // 使用更薄的环（内径 14，外径 15），看起来像一根震动的弦
+        const geo = new THREE.RingGeometry(14, 15, 64);
+        const mat = new THREE.MeshBasicMaterial({ color: 0x88ddff, transparent: true, opacity: 0.4, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.rotation.x = Math.PI / 2;
         this.group.add(mesh);
@@ -289,9 +290,9 @@ class Galaxy {
     _updateShockwaves() {
         for (let i = this.shockwaves.length - 1; i >= 0; i--) {
             const sw = this.shockwaves[i];
-            sw.life -= 0.02;
-            sw.mesh.scale.addScalar(20);
-            sw.mesh.material.opacity = Math.max(0, sw.life * 0.8);
+            sw.life -= 0.025; // 稍微加快消失
+            sw.mesh.scale.addScalar(15);
+            sw.mesh.material.opacity = Math.max(0, sw.life * 0.4);
             if (sw.life <= 0) { this.group.remove(sw.mesh); sw.mesh.geometry.dispose(); sw.mesh.material.dispose(); this.shockwaves.splice(i, 1); }
         }
     }
