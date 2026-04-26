@@ -1,109 +1,94 @@
 /**
  * Cloudflare Worker — 词提交网关
- *
- * 环境变量（在 CF 控制台 / wrangler secret put 设置，不写进代码）：
- *   TURNSTILE_SECRET     — Cloudflare Turnstile secret key
- *   SUPABASE_SERVICE_ROLE — Supabase service_role key
- *
- * 公开变量（wrangler.toml [vars] 里设置即可）：
- *   SUPABASE_URL         — https://xxxxx.supabase.co
- *   ALLOWED_ORIGIN       — https://linzefei.github.io （或自定义域名）
  */
 
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
+    const allowed = (env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim());
+    const isAllowed = allowed.includes(origin);
+    const allowHeader = isAllowed ? origin : allowed[0];
 
-    // Preflight
+    // 处理预检请求 (Preflight)
     if (request.method === 'OPTIONS') {
-      return corsResponse('', 204, origin, env);
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': allowHeader,
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Max-Age': '86400',
+        }
+      });
     }
 
     if (request.method !== 'POST') {
-      return corsResponse(JSON.stringify({ error: 'method not allowed' }), 405, origin, env);
+      return new Response(JSON.stringify({ error: 'method not allowed' }), { 
+        status: 405, 
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': allowHeader } 
+      });
     }
 
     const url = new URL(request.url);
+    let response;
 
     if (url.pathname === '/submit-word') {
-      return handleSubmitWord(request, env, origin);
+      response = await handleSubmitWord(request, env);
+    } else {
+      response = new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
     }
 
-    return corsResponse(JSON.stringify({ error: 'not found' }), 404, origin, env);
+    // 为所有响应添加 CORS 头
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('Access-Control-Allow-Origin', allowHeader);
+    newHeaders.set('Content-Type', 'application/json');
+
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders
+    });
   }
 };
 
-async function handleSubmitWord(request, env, origin) {
-  // ── 解析请求体 ──────────────────────────────────────────────────────────
+async function handleSubmitWord(request, env) {
   let body;
-  try {
-    body = await request.json();
-  } catch {
-    return corsResponse(JSON.stringify({ error: 'invalid json' }), 400, origin, env);
-  }
+  try { body = await request.json(); } catch { return new Response(JSON.stringify({ error: 'invalid json' }), { status: 400 }); }
 
   const { word, visitor_id, turnstile_token } = body;
-
-  // ── 基本校验 ────────────────────────────────────────────────────────────
   const trimmed = (word || '').trim();
-  if (!trimmed || trimmed.length > 20) {
-    return corsResponse(JSON.stringify({ error: 'invalid word' }), 400, origin, env);
-  }
-  if (!visitor_id || typeof visitor_id !== 'string') {
-    return corsResponse(JSON.stringify({ error: 'missing visitor_id' }), 400, origin, env);
-  }
-  if (!turnstile_token) {
-    return corsResponse(JSON.stringify({ error: 'captcha required' }), 400, origin, env);
-  }
 
-  // ── 验证 Turnstile CAPTCHA ───────────────────────────────────────────────
+  if (!trimmed || trimmed.length > 20) return new Response(JSON.stringify({ error: 'invalid word' }), { status: 400 });
+  if (!visitor_id) return new Response(JSON.stringify({ error: 'missing visitor_id' }), { status: 400 });
+  if (!turnstile_token) return new Response(JSON.stringify({ error: 'captcha required' }), { status: 400 });
+
+  // 1. 验证 Turnstile
   const ip = request.headers.get('CF-Connecting-IP') || '';
   const form = new FormData();
-  form.append('secret',   env.TURNSTILE_SECRET);
+  form.append('secret', env.TURNSTILE_SECRET);
   form.append('response', turnstile_token);
   form.append('remoteip', ip);
 
-  const tsRes  = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-    method: 'POST', body: form
-  });
+  const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form });
   const tsData = await tsRes.json();
+  if (!tsData.success) return new Response(JSON.stringify({ error: 'captcha failed', detail: tsData['error-codes'] }), { status: 403 });
 
-  if (!tsData.success) {
-    return corsResponse(JSON.stringify({ error: 'captcha failed', codes: tsData['error-codes'] }), 403, origin, env);
-  }
-
-  // ── 写入 Supabase（service_role，绕过 RLS 限制但有代码层校验）─────────────
+  // 2. 写入 Supabase
   const sbRes = await fetch(`${env.SUPABASE_URL}/rest/v1/visitor_words`, {
     method: 'POST',
     headers: {
-      'apikey':        env.SUPABASE_SERVICE_ROLE,
+      'apikey': env.SUPABASE_SERVICE_ROLE,
       'Authorization': 'Bearer ' + env.SUPABASE_SERVICE_ROLE,
-      'Content-Type':  'application/json',
-      'Prefer':        'return=minimal'
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
     },
     body: JSON.stringify({ word: trimmed, visitor_id, source: 'visitor' })
   });
 
   if (!sbRes.ok) {
-    const errText = await sbRes.text();
-    return corsResponse(JSON.stringify({ error: 'db error', detail: errText }), 500, origin, env);
+    const detail = await sbRes.text();
+    return new Response(JSON.stringify({ error: 'db error', detail }), { status: 500 });
   }
 
-  return corsResponse(JSON.stringify({ ok: true }), 200, origin, env);
-}
-
-function corsResponse(body, status, origin, env) {
-  const allowed = (env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim());
-  // 若 origin 在白名单内则精确匹配，否则回退 *（含 origin=null 等非法值）
-  const allow = (origin && allowed.includes(origin)) ? origin : '*';
-
-  return new Response(body, {
-    status,
-    headers: {
-      'Content-Type':                'application/json',
-      'Access-Control-Allow-Origin': allow,
-      'Access-Control-Allow-Methods':'POST, OPTIONS',
-      'Access-Control-Allow-Headers':'Content-Type',
-    }
-  });
+  return new Response(JSON.stringify({ ok: true }), { status: 200 });
 }
