@@ -7,6 +7,7 @@
 
 ## 项目概览
 
+- **部署与密钥**：本地存有 `.env.local` 用于复用 GitHub PAT 和 Cloudflare API Token。该文件已加入 `.gitignore`，严禁提交。
 - **类型**：GitHub Pages 静态博客（无服务器）
 - **域名**：linzefei.github.io（或自定义域名，见 CNAME）
 - **数据库**：Supabase（PostgreSQL + RLS）

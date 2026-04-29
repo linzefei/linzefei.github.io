@@ -302,25 +302,18 @@
         if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
     };
     function awaitTurnstile() {
-        // 有缓存的新鲜 token（上次超时后用户点击验证框获得的）直接复用
-        if (_tsCachedToken && Date.now() - _tsCachedAt < _TS_TTL) {
-            const t = _tsCachedToken; _tsCachedToken = null;
-            return Promise.resolve(t);
-        }
         return new Promise(resolve => {
-            // 15s 超时（原来 45s 太长）
-            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 15000);
-            _tsResolve = t => { clearTimeout(tid); resolve(t); };
-            // 网络恢复时立即放弃等待，让用户重试
-            const onOnline = () => { clearTimeout(tid); _tsResolve = null; resolve(null); };
-            window.addEventListener('online', onOnline, { once: true });
             const el = document.getElementById('cf-turnstile');
-            if (typeof turnstile !== 'undefined') {
-                turnstile.reset(el);
-                turnstile.execute(el);
-            } else {
-                resolve(null);
-            }
+            if (typeof turnstile === 'undefined') { resolve(null); return; }
+            
+            // 强制重置并重新执行，确保拿到的是最新且匹配当前域名的 Token
+            turnstile.reset(el);
+            
+            // 设置一个较短的超时，如果 10s 没拿到就放弃
+            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 10000);
+            _tsResolve = t => { clearTimeout(tid); resolve(t); };
+            
+            turnstile.execute(el);
         });
     }
 
