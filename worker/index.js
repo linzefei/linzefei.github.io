@@ -1,5 +1,5 @@
 /**
- * Cloudflare Worker — 词提交网关
+ * Cloudflare Worker — 词提交网关 (带详细错误诊断)
  */
 
 export default {
@@ -9,7 +9,6 @@ export default {
     const isAllowed = allowed.includes(origin);
     const allowHeader = isAllowed ? origin : allowed[0];
 
-    // 处理预检请求 (Preflight)
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,
@@ -23,22 +22,22 @@ export default {
     }
 
     if (request.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'method not allowed' }), { 
-        status: 405, 
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': allowHeader } 
-      });
+      return new Response(JSON.stringify({ error: 'method not allowed' }), { status: 405 });
     }
 
     const url = new URL(request.url);
     let response;
 
-    if (url.pathname === '/submit-word') {
-      response = await handleSubmitWord(request, env);
-    } else {
-      response = new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    try {
+      if (url.pathname === '/submit-word') {
+        response = await handleSubmitWord(request, env);
+      } else {
+        response = new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+      }
+    } catch (err) {
+      response = new Response(JSON.stringify({ error: 'worker internal error', message: err.message }), { status: 500 });
     }
 
-    // 为所有响应添加 CORS 头
     const newHeaders = new Headers(response.headers);
     newHeaders.set('Access-Control-Allow-Origin', allowHeader);
     newHeaders.set('Content-Type', 'application/json');
@@ -59,8 +58,15 @@ async function handleSubmitWord(request, env) {
   const trimmed = (word || '').trim();
 
   if (!trimmed || trimmed.length > 20) return new Response(JSON.stringify({ error: 'invalid word' }), { status: 400 });
-  if (!visitor_id) return new Response(JSON.stringify({ error: 'missing visitor_id' }), { status: 400 });
-  if (!turnstile_token) return new Response(JSON.stringify({ error: 'captcha required' }), { status: 400 });
+  if (!turnstile_token) return new Response(JSON.stringify({ error: 'captcha token missing' }), { status: 400 });
+
+  // ── 诊断：检查环境变量是否丢失 ──
+  if (!env.TURNSTILE_SECRET) {
+    return new Response(JSON.stringify({ error: 'config error', detail: 'TURNSTILE_SECRET is not set in Worker secrets' }), { status: 500 });
+  }
+  if (!env.SUPABASE_SERVICE_ROLE) {
+    return new Response(JSON.stringify({ error: 'config error', detail: 'SUPABASE_SERVICE_ROLE is not set in Worker secrets' }), { status: 500 });
+  }
 
   // 1. 验证 Turnstile
   const ip = request.headers.get('CF-Connecting-IP') || '';
@@ -71,7 +77,14 @@ async function handleSubmitWord(request, env) {
 
   const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form });
   const tsData = await tsRes.json();
-  if (!tsData.success) return new Response(JSON.stringify({ error: 'captcha failed', detail: tsData['error-codes'] }), { status: 403 });
+  
+  if (!tsData.success) {
+    return new Response(JSON.stringify({ 
+      error: 'captcha validation failed', 
+      detail: tsData['error-codes'],
+      hint: 'Please ensure linzefei.com is added to your Turnstile widget domains.'
+    }), { status: 403 });
+  }
 
   // 2. 写入 Supabase
   const sbRes = await fetch(`${env.SUPABASE_URL}/rest/v1/visitor_words`, {
@@ -87,7 +100,7 @@ async function handleSubmitWord(request, env) {
 
   if (!sbRes.ok) {
     const detail = await sbRes.text();
-    return new Response(JSON.stringify({ error: 'db error', detail }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'supabase db error', detail }), { status: 500 });
   }
 
   return new Response(JSON.stringify({ ok: true }), { status: 200 });
