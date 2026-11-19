@@ -171,3 +171,59 @@ grant execute on function update_visitor_name(text, text, text) to anon;
 insert into site_content (key, value)
 values ('display_order', '["Hello World!", "Three.js", "JavaScript", "Python", "Java", "C++", "React", "Vue", "Angular", "Node.js", "linzefei", "Cursor", "2025"]')
 on conflict (key) do nothing;
+
+
+-- 9. 点亮（ignite）：计数字段 + 点亮记录表 + toggle RPC
+-- （与 admin/ignite.sql 相同；已初始化过的库单独跑 ignite.sql 即可）
+alter table visitor_words
+  add column if not exists ignite_count int not null default 0;
+
+create table if not exists word_ignites (
+  word_id    uuid        not null references visitor_words(id) on delete cascade,
+  visitor_id text        not null,
+  created_at timestamptz default now(),
+  primary key (word_id, visitor_id)
+);
+
+alter table word_ignites enable row level security;
+
+drop policy if exists "auth all ignites" on word_ignites;
+create policy "auth all ignites" on word_ignites
+  for all to authenticated using (true) with check (true);
+
+create or replace function toggle_ignite(
+  p_word_id    uuid,
+  p_visitor_id text
+) returns jsonb
+language plpgsql
+security definer
+as $$
+declare
+  v_count   int;
+  v_ignited boolean;
+begin
+  if p_visitor_id is null or length(trim(p_visitor_id)) = 0 then
+    return jsonb_build_object('error', 'visitor_id required');
+  end if;
+  if not exists (select 1 from visitor_words where id = p_word_id and approved = true) then
+    return jsonb_build_object('error', 'word not found');
+  end if;
+
+  if exists (select 1 from word_ignites where word_id = p_word_id and visitor_id = p_visitor_id) then
+    delete from word_ignites where word_id = p_word_id and visitor_id = p_visitor_id;
+    v_ignited := false;
+  else
+    insert into word_ignites (word_id, visitor_id) values (p_word_id, p_visitor_id);
+    v_ignited := true;
+  end if;
+
+  update visitor_words
+     set ignite_count = (select count(*) from word_ignites where word_id = p_word_id)
+   where id = p_word_id
+  returning ignite_count into v_count;
+
+  return jsonb_build_object('ignited', v_ignited, 'ignite_count', v_count);
+end;
+$$;
+
+grant execute on function toggle_ignite(uuid, text) to anon;

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Galaxy · linzefei</title>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -64,90 +63,6 @@
             100% { transform: translate(-50%,-50%) scale(1);  opacity: 0; width: 160px; height: 160px; }
         }
 
-        /* ── 留词按钮 ── */
-        #word-btn {
-            position: fixed;
-            bottom: 28px; right: 28px;
-            width: 44px; height: 44px;
-            border-radius: 50%;
-            border: 1px solid rgba(140,200,255,0.45);
-            background: rgba(0,0,0,0.55);
-            color: rgba(140,200,255,0.85);
-            font-size: 20px;
-            line-height: 44px;
-            text-align: center;
-            cursor: pointer;
-            backdrop-filter: blur(6px);
-            transition: border-color .3s, color .3s, box-shadow .3s;
-            z-index: 100;
-            user-select: none;
-        }
-        #word-btn:hover {
-            border-color: rgba(140,200,255,0.9);
-            color: #fff;
-            box-shadow: 0 0 14px rgba(140,200,255,0.3);
-        }
-
-        /* ── 留词面板 ── */
-        #word-panel {
-            position: fixed;
-            bottom: 82px; right: 28px;
-            width: 256px;
-            background: rgba(4,4,16,0.85);
-            border: 1px solid rgba(140,200,255,0.22);
-            border-radius: 12px;
-            padding: 16px;
-            backdrop-filter: blur(14px);
-            z-index: 100;
-            display: none;
-            flex-direction: column;
-            gap: 10px;
-        }
-        #word-panel.open { display: flex; }
-
-        #word-panel p {
-            color: rgba(255,255,255,0.38);
-            font-size: 11px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-
-        #word-input {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(140,200,255,0.28);
-            border-radius: 7px;
-            color: #fff;
-            font-size: 14px;
-            padding: 8px 12px;
-            outline: none;
-            width: 100%;
-            letter-spacing: 1px;
-        }
-        #word-input::placeholder { color: rgba(255,255,255,0.18); }
-        #word-input:focus { border-color: rgba(140,200,255,0.6); }
-
-        #word-submit {
-            background: rgba(140,200,255,0.1);
-            border: 1px solid rgba(140,200,255,0.38);
-            border-radius: 7px;
-            color: rgba(140,200,255,0.88);
-            font-size: 11px;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            padding: 8px 0;
-            cursor: pointer;
-            transition: background .2s, color .2s;
-        }
-        #word-submit:hover   { background: rgba(140,200,255,0.2); color: #fff; }
-        #word-submit:disabled { opacity: 0.35; cursor: default; }
-
-        #word-msg {
-            color: rgba(140,200,255,0.65);
-            font-size: 11px;
-            text-align: center;
-            min-height: 14px;
-            letter-spacing: 1px;
-        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -168,26 +83,6 @@
         <div id="site-version" style="margin-top:4px;opacity:0.6;font-size:10px;letter-spacing:1px;"></div>
     </div>
 
-    <div id="word-btn" title="在银河中留下你的词">✦</div>
-    <div id="word-panel">
-        <p>Leave a word in the galaxy</p>
-        <input id="word-input" type="text" maxlength="20" placeholder="your word ..." autocomplete="off" />
-        <!-- Turnstile CAPTCHA（interaction-only：正常用户不可见，VPN/异常时弹验证框） -->
-        <div id="cf-turnstile"
-             class="cf-turnstile"
-             data-sitekey="0x4AAAAAACi-7dw4QwkMDret"
-             data-theme="dark"
-             data-size="flexible"
-             data-appearance="interaction-only"
-             data-execution="execute"
-             data-callback="onTurnstileToken"
-             data-error-callback="onTurnstileError"
-             data-expired-callback="onTurnstileExpired">
-        </div>
-        <button id="word-submit">Send to Galaxy</button>
-        <div id="word-msg"></div>
-    </div>
-
     <script src="js/api-config.js"></script>
     <script src="js/config.js"></script>
     <script src="js/galaxy.js"></script>
@@ -196,7 +91,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.4.1';
+    const SITE_VERSION = 'v0.5.0';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -254,8 +149,6 @@
 
     /* ─── Click vibration + shooting star ───────────────────────────────── */
     document.addEventListener('click', function(e) {
-        if (e.target.closest('#word-panel') || e.target.id === 'word-btn') return;
-        
         if (typeof galaxy !== 'undefined' && galaxy) {
             // 触发空间震动（所有粒子颤动）
             if (galaxy.triggerVibration) galaxy.triggerVibration();
@@ -270,139 +163,9 @@
         if (h) h.style.opacity = '0';
     }, 6000);
 
-    /* ─── 留词面板交互 ───────────────────────────────────────────────────── */
-    const wordBtn   = document.getElementById('word-btn');
-    const wordPanel = document.getElementById('word-panel');
-    const wordInput = document.getElementById('word-input');
-    const wordSub   = document.getElementById('word-submit');
-    const wordMsg   = document.getElementById('word-msg');
-
-    wordBtn.addEventListener('click', () => {
-        wordPanel.classList.toggle('open');
-        if (wordPanel.classList.contains('open')) wordInput.focus();
-    });
-    wordInput.addEventListener('keydown', e => { if (e.key === 'Enter') wordSub.click(); });
-
-    // Turnstile 回调：缓存 token，超时后点击的 token 也不丢失
-    let _tsResolve = null;
-    let _tsCachedToken = null;
-    let _tsCachedAt = 0;
-    const _TS_TTL = 240000; // 4 分钟（token 5 分钟过期，留 1 分钟余量）
-
-    window.onTurnstileToken = function(token) {
-        _tsCachedToken = token;
-        _tsCachedAt = Date.now();
-        if (_tsResolve) { _tsResolve(token); _tsResolve = null; }
-    };
-    window.onTurnstileError = function() {
-        if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
-    };
-    window.onTurnstileExpired = function() {
-        _tsCachedToken = null;
-        if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
-    };
-    function awaitTurnstile() {
-        return new Promise(resolve => {
-            const el = document.getElementById('cf-turnstile');
-            if (typeof turnstile === 'undefined') { resolve(null); return; }
-            
-            // 强制重置并重新执行，确保拿到的是最新且匹配当前域名的 Token
-            turnstile.reset(el);
-            
-            // 设置一个较短的超时，如果 10s 没拿到就放弃
-            const tid = setTimeout(() => { _tsResolve = null; resolve(null); }, 10000);
-            _tsResolve = t => { clearTimeout(tid); resolve(t); };
-            
-            turnstile.execute(el);
-        });
-    }
-
-    wordSub.addEventListener('click', async () => {
-        const word = wordInput.value.trim();
-        if (!word) return;
-
-        wordSub.disabled = true;
-        wordMsg.textContent = 'checking...';
-
-        // 检查词是否已存在（查询已审核通过的公开词，不区分大小写）
-        try {
-            const checkRes = await fetch(SB_URL + '/rest/v1/visitor_words?word=ilike.' + encodeURIComponent(word) + '&approved=eq.true&select=word', {
-                headers: SB_HDR
-            });
-            if (checkRes.ok) {
-                const existing = await checkRes.json();
-                if (existing.length > 0) {
-                    wordMsg.textContent = '✦ this word already exists in the galaxy';
-                    wordSub.disabled = false;
-                    return;
-                }
-            }
-        } catch (err) {
-            console.warn('[word check] failed:', err);
-            // 查询失败不阻止提交，继续走后续流程
-        }
-
-        wordMsg.textContent = 'verifying...';
-
-        // 超过 4s 仍未获得 token，提示用户找验证框点击
-        const hintTimer = setTimeout(() => {
-            if (wordSub.disabled) wordMsg.textContent = 'click the verification box above ↑';
-        }, 4000);
-
-        const tsToken = await awaitTurnstile();
-        clearTimeout(hintTimer);
-
-        if (!tsToken) {
-            wordMsg.textContent = 'verification failed – try again';
-            wordSub.disabled = false;
-            return;
-        }
-
-        wordMsg.textContent = 'sending...';
-        try {
-            const res = await fetch(WORKER_URL + '/submit-word', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word, visitor_id: vid, turnstile_token: tsToken })
-            });
-            if (res.ok) {
-                wordMsg.textContent = '✦ entering your galaxy...';
-                wordInput.value = '';
-                saveMyWord(word);
-                wordQueue.unshift(word);
-                updateWordCount();
-                setTimeout(() => {
-                    wordMsg.textContent = '';
-                    wordPanel.classList.remove('open');
-                }, 2000);
-            } else {
-                const err = await res.json().catch(() => ({}));
-                console.error('[word submit] server error:', res.status, err);
-                wordMsg.textContent = `[${res.status}] ${err.error || 'server error'}`;
-            }
-        } catch (err) {
-            console.error('[word submit] fetch failed:', err);
-            wordMsg.textContent = 'net err: ' + (err.message || String(err));
-        }
-        wordSub.disabled = false;
-    });
-
-    /* ─── 本人提交词持久化（localStorage）────────────────────────────────── */
+    /* ─── 本人历史词（localStorage，只读）（localStorage）────────────────────────────────── */
     const MY_WORDS_KEY = '_my_words';
     const MY_TIMES_KEY = '_my_times';
-    function saveMyWord(word) {
-        const list = getMyWords();
-        if (!list.includes(word)) {
-            list.unshift(word);
-            localStorage.setItem(MY_WORDS_KEY, JSON.stringify(list.slice(0, 20)));
-        }
-        // 记录提交时间（已有的不覆盖）
-        const times = JSON.parse(localStorage.getItem(MY_TIMES_KEY) || '{}');
-        if (!times[word]) {
-            times[word] = new Date().toISOString();
-            localStorage.setItem(MY_TIMES_KEY, JSON.stringify(times));
-        }
-    }
     function getMyWords() {
         try { return JSON.parse(localStorage.getItem(MY_WORDS_KEY) || '[]'); } catch { return []; }
     }
@@ -427,25 +190,40 @@
         if (el) el.textContent = wordQueue.length + ' words';
     }
 
+    /* ─── 点亮档位：0=未点亮 1=1-2次 2=3-9次 3=10次以上（封顶） ─── */
+    function igniteTier(count) {
+        if (count >= 10) return 3;
+        if (count >= 3)  return 2;
+        if (count >= 1)  return 1;
+        return 0;
+    }
+
     async function fetchWords() {
-        let dbWords = [];
+        let dbEntries = [];
         try {
             const res = await fetch(
-                SB_URL + '/rest/v1/visitor_words?select=word,sort_order&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
+                SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
                 { headers: SB_HDR }
             );
             if (res.ok) {
                 const rows = await res.json();
-                dbWords = rows.map(r => r.word);
+                dbEntries = rows.map(r => ({ word: r.word, id: r.id, ignite_count: r.ignite_count || 0 }));
             }
         } catch {}
 
-        // 本人提交过的词（已审或待审都给自己看）
-        const myWords = getMyWords();
+        if (!dbEntries.length) {
+            dbEntries = DEFAULT_WORDS.map(w => ({ word: w, id: null, ignite_count: 0 }));
+        }
 
-        // 合并：自己的词优先排在前面，去重
-        const merged = [...new Set([...myWords, ...(dbWords.length ? dbWords : DEFAULT_WORDS)])];
-        wordQueue = merged;
+        // 本人在本机提交过的词优先排在前面（按词文本匹配数据库条目）
+        const myWords = getMyWords();
+        const front = [], rest = [...dbEntries];
+        myWords.forEach(w => {
+            const i = rest.findIndex(e => e.word === w);
+            if (i >= 0) front.push(rest.splice(i, 1)[0]);
+            else front.unshift({ word: w, id: null, ignite_count: 0 });
+        });
+        wordQueue = [...front, ...rest];
         // 恢复上次播放序号，防止越界
         const savedIdx = parseInt(localStorage.getItem(QUEUE_IDX_KEY) || '0', 10);
         queueIndex = wordQueue.length > 0 ? (isNaN(savedIdx) ? 0 : savedIdx % wordQueue.length) : 0;
@@ -464,10 +242,10 @@
             localStorage.setItem(QUEUE_IDX_KEY, queueIndex.toString());
         }
 
-        // 启动下一个词
-        const nextWord = wordQueue[queueIndex];
-        if (nextWord) {
-            activeWord = new WordParticles(nextWord, wordScene, wordCamera);
+        // 启动下一个词（带点亮档位：被点亮越多的词，粒子越大）
+        const entry = wordQueue[queueIndex];
+        if (entry) {
+            activeWord = new WordParticles(entry.word, wordScene, wordCamera, igniteTier(entry.ignite_count));
         }
     }
 

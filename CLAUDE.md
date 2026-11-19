@@ -206,3 +206,15 @@ CLOUDFLARE_API_TOKEN=<你的token> npx wrangler deploy
 | 数据库 | Supabase | 免费 tier 够用，RLS 提供基本安全，Realtime 支持 |
 | CAPTCHA | Cloudflare Turnstile | 免费、无感知、无需 Google 账号 |
 | Worker | Cloudflare Workers | 免费 10w 请求/天，edge 节点快，环境变量安全存 key |
+
+---
+
+## 2026-11-19 变更：只支持作者输入 + 点亮（ignite）
+
+**决策**：本站定位是作者个人记录。访客不再能留词，只能点亮。
+
+- **留词（作者）**：走 `/admin` 后台「内容管理 → 直接添加词」（source='admin'，直接 approved）。
+- **首页**：已移除公开留词入口（按钮/面板/Turnstile 及提交逻辑，v0.5.0）。
+- **Worker**：`/submit-word` 改为一律 403（防绕过前端直接调用）。**待部署**：`cd worker && npx wrangler deploy`。
+- **点亮**：访客在 `/words.html` 点词条上的 ✦ 点亮/取消；首页词粒子按点亮档位变大（档位：1-2 次→1，3-9 次→2，10+ 次→3，粒子倍率 1.2/1.4/1.6）。
+- **数据**：`visitor_words.ignite_count` + `word_ignites` 表 + RPC `toggle_ignite(word_id, visitor_id)`（security definer，anon 只能经 RPC 读写，本机用 localStorage `_ignited` 记自己点过的词）。**待执行**：在 Supabase SQL Editor 跑 `admin/ignite.sql`（已同步进 `setup.sql` 第 9 节）。
