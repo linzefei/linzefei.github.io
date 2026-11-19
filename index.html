@@ -201,10 +201,17 @@
     async function fetchWords() {
         let dbEntries = [];
         try {
-            const res = await fetch(
+            // 先带 ignite_count 查；若 ignite.sql 还没在 Supabase 执行（无此列），降级为基础查询
+            let res = await fetch(
                 SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
                 { headers: SB_HDR }
             );
+            if (!res.ok) {
+                res = await fetch(
+                    SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
+                    { headers: SB_HDR }
+                );
+            }
             if (res.ok) {
                 const rows = await res.json();
                 dbEntries = rows.map(r => ({ word: r.word, id: r.id, ignite_count: r.ignite_count || 0 }));

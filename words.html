@@ -378,10 +378,16 @@
         let approvedSet = new Set();
         let igniteMap = {};
         try {
-            const res = await fetch(
+            let res = await fetch(
                 SB_URL + '/rest/v1/visitor_words?select=word,ignite_count&approved=eq.true&limit=500',
                 { headers: SB_HDR }
             );
+            if (!res.ok) { // ignite.sql 未执行时降级
+                res = await fetch(
+                    SB_URL + '/rest/v1/visitor_words?select=word&approved=eq.true&limit=500',
+                    { headers: SB_HDR }
+                );
+            }
             if (res.ok) (await res.json()).forEach(r => { approvedSet.add(r.word); igniteMap[r.word] = r.ignite_count || 0; });
         } catch {}
 
@@ -444,10 +450,16 @@
     async function loadAllWords() {
         const el = document.getElementById('all-word-list');
         try {
-            const res = await fetch(
+            let res = await fetch(
                 SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
+            if (!res.ok) { // ignite.sql 未执行时降级为基础查询，词列表照常显示
+                res = await fetch(
+                    SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
+                    { headers: SB_HDR }
+                );
+            }
             if (!res.ok) throw new Error();
             const words = await res.json();
 
