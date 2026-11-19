@@ -2,8 +2,11 @@
  * WordParticles – 粒子聚合成字
  */
 class WordParticles {
-    constructor(word, scene, camera) {
+    constructor(word, scene, camera, tier) {
         this.word = word; this.scene = scene; this.camera = camera;
+        // 点亮档位 0-3：被点亮越多，粒子越大（越大越亮的视觉近似）
+        this.tier = tier || 0;
+        this.sizeFactor = [1, 1.2, 1.4, 1.6][this.tier] || 1;
         this.phase = 'assembling'; this.tick = 0;
         this.T_ASSEMBLE = 120; this.T_HOLD = 220; this.T_DISPERSE = 110;
         this._init();
@@ -43,7 +46,7 @@ class WordParticles {
         this.geo = new THREE.BufferGeometry();
         this.geo.setAttribute('position', new THREE.BufferAttribute(this.cur, 3));
         this.geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        this.mat = new THREE.PointsMaterial({ size: 3.6, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true });
+        this.mat = new THREE.PointsMaterial({ size: 3.6 * this.sizeFactor, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true });
         this.points = new THREE.Points(this.geo, this.mat);
         this.points.position.set(0, 105, 0); // 继续上移一点
         this.scene.add(this.points);

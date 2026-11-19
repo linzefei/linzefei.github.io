@@ -129,6 +129,25 @@
         .chip-flag { font-size: 11px; }
         .chip-author { font-size: 9px; color: rgba(140,200,255,0.35); letter-spacing: 1px; }
 
+        /* ── 点亮（ignite）── */
+        .chip-ignite {
+            font-size: 11px; letter-spacing: 0;
+            color: rgba(255,255,255,0.22);
+            cursor: pointer; user-select: none;
+            transition: color .2s, text-shadow .2s;
+        }
+        .chip-ignite:hover { color: rgba(255,215,0,0.85); }
+        .chip-ignite.lit { color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,0.55); }
+        .chip-ignite.busy { opacity: 0.4; pointer-events: none; }
+        .word-chip.tier-1 { border-color: rgba(255,215,0,0.22); }
+        .word-chip.tier-2 { border-color: rgba(255,215,0,0.45); background: rgba(255,215,0,0.04); }
+        .word-chip.tier-3 {
+            border-color: rgba(255,215,0,0.75); background: rgba(255,215,0,0.07);
+            box-shadow: 0 0 14px rgba(255,215,0,0.18);
+            font-size: 14px;
+        }
+        .my-word-ignite { font-size: 11px; color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,0.45); white-space: nowrap; }
+
         /* ── My words ── */
         .my-words { display: flex; flex-direction: column; gap: 6px; }
         .my-word-row {
@@ -352,17 +371,24 @@
         } catch {}
 
         if (myWords.length === 0) {
-            el.innerHTML = '<div class="empty-hint">no words yet · go leave one in the galaxy</div>';
+            el.innerHTML = '<div class="empty-hint">no words yet</div>';
             return;
         }
 
         let approvedSet = new Set();
+        let igniteMap = {};
         try {
-            const res = await fetch(
-                SB_URL + '/rest/v1/visitor_words?select=word&approved=eq.true&limit=500',
+            let res = await fetch(
+                SB_URL + '/rest/v1/visitor_words?select=word,ignite_count&approved=eq.true&limit=500',
                 { headers: SB_HDR }
             );
-            if (res.ok) (await res.json()).forEach(r => approvedSet.add(r.word));
+            if (!res.ok) { // ignite.sql 未执行时降级
+                res = await fetch(
+                    SB_URL + '/rest/v1/visitor_words?select=word&approved=eq.true&limit=500',
+                    { headers: SB_HDR }
+                );
+            }
+            if (res.ok) (await res.json()).forEach(r => { approvedSet.add(r.word); igniteMap[r.word] = r.ignite_count || 0; });
         } catch {}
 
         el.innerHTML = myWords.map(word => {
@@ -371,6 +397,7 @@
             return `
                 <div class="my-word-row">
                     <div class="my-word-text">${esc(word)}</div>
+                    ${igniteMap[word] ? `<span class="my-word-ignite">✦ ${igniteMap[word]}</span>` : ''}
                     <span class="status-pill ${approved ? 'pill-ok' : 'pill-pending'}">
                         ${approved ? '✓ live' : 'pending'}
                     </span>
@@ -379,14 +406,60 @@
         }).join('');
     }
 
+    /* ── 点亮状态（本机记录，与身份系统同一思路：清缓存即重置） ────────────── */
+    const IGNITED_KEY = '_ignited';
+    function getIgnited() {
+        try { return new Set(JSON.parse(localStorage.getItem(IGNITED_KEY) || '[]')); } catch { return new Set(); }
+    }
+    function saveIgnited(set) {
+        try { localStorage.setItem(IGNITED_KEY, JSON.stringify([...set])); } catch {}
+    }
+    function igniteTier(count) {
+        if (count >= 10) return 3;
+        if (count >= 3)  return 2;
+        if (count >= 1)  return 1;
+        return 0;
+    }
+
+    async function toggleIgnite(wordId, el) {
+        if (el.classList.contains('busy')) return;
+        el.classList.add('busy');
+        try {
+            const res = await fetch(SB_URL + '/rest/v1/rpc/toggle_ignite', {
+                method: 'POST',
+                headers: { ...SB_HDR, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ p_word_id: wordId, p_visitor_id: vid })
+            });
+            if (!res.ok) throw new Error();
+            const out = await res.json();
+            if (out && !out.error) {
+                const set = getIgnited();
+                if (out.ignited) set.add(wordId); else set.delete(wordId);
+                saveIgnited(set);
+                await loadAllWords();
+                return;
+            }
+            throw new Error();
+        } catch {
+            el.classList.remove('busy');
+            el.title = 'ignite failed · try again';
+        }
+    }
+
     /* ── 全部公开词 ──────────────────────────────────────────────────────── */
     async function loadAllWords() {
         const el = document.getElementById('all-word-list');
         try {
-            const res = await fetch(
-                SB_URL + '/rest/v1/visitor_words?select=word,created_at,visitor_id,source&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
+            let res = await fetch(
+                SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
+            if (!res.ok) { // ignite.sql 未执行时降级为基础查询，词列表照常显示
+                res = await fetch(
+                    SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
+                    { headers: SB_HDR }
+                );
+            }
             if (!res.ok) throw new Error();
             const words = await res.json();
 
@@ -406,19 +479,26 @@
                 } catch {}
             }
 
+            const ignited = getIgnited();
             el.innerHTML = words.map(w => {
                 const v    = visitorMap[w.visitor_id] || {};
                 const flag = countryFlag(v.country_code);
                 const name = w.source === 'default' || w.source === 'admin'
                     ? ''
                     : (v.display_name || 'anon·' + (w.visitor_id || '?').slice(-4));
+                const count = w.ignite_count || 0;
+                const lit = ignited.has(w.id);
                 return `
-                    <div class="word-chip">
+                    <div class="word-chip tier-${igniteTier(count)}">
                         ${flag ? `<span class="chip-flag">${flag}</span>` : ''}
                         <span>${esc(w.word)}</span>
                         ${name ? `<span class="chip-author">${esc(name)}</span>` : ''}
+                        <span class="chip-ignite ${lit ? 'lit' : ''}" data-ignite="${w.id}" title="${lit ? 'ignited · click to undo' : 'ignite this word'}">✦${count ? ' ' + count : ''}</span>
                     </div>`;
             }).join('');
+            el.querySelectorAll('[data-ignite]').forEach(el2 => {
+                el2.addEventListener('click', () => toggleIgnite(el2.getAttribute('data-ignite'), el2));
+            });
         } catch {
             el.innerHTML = '<div class="empty-hint">could not load · try again later</div>';
         }
