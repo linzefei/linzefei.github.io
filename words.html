@@ -412,6 +412,12 @@
     function getIgnited() {
         try { return new Set(JSON.parse(localStorage.getItem(IGNITED_KEY) || '[]')); } catch { return new Set(); }
     }
+    function igniteTier(count) {
+        if (count >= 10) return 3;
+        if (count >= 3)  return 2;
+        if (count >= 1)  return 1;
+        return 0;
+    }
     /* ── 全部公开词 ──────────────────────────────────────────────────────── */
     async function loadAllWords() {
         const el = document.getElementById('all-word-list');
@@ -420,7 +426,7 @@
                 SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
-            if (!res.ok) throw new Error('HTTP ' + res.status);
+            if (!res.ok) throw new Error();
             const words = await res.json();
 
             if (words.length === 0) {
@@ -456,8 +462,8 @@
                         <span class="chip-ignite ${lit ? 'lit' : ''}" title="ignite on the homepage">✦${count ? ' ' + count : ''}</span>
                     </div>`;
             }).join('');
-        } catch (e) {
-            el.innerHTML = '<div class="empty-hint">could not load · ' + esc(String((e && e.message) || e)) + '</div>';
+        } catch {
+            el.innerHTML = '<div class="empty-hint">could not load · try again later</div>';
         }
     }
 
