@@ -420,7 +420,7 @@
                 SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
-            if (!res.ok) throw new Error();
+            if (!res.ok) throw new Error('HTTP ' + res.status);
             const words = await res.json();
 
             if (words.length === 0) {
@@ -456,8 +456,8 @@
                         <span class="chip-ignite ${lit ? 'lit' : ''}" title="ignite on the homepage">✦${count ? ' ' + count : ''}</span>
                     </div>`;
             }).join('');
-        } catch {
-            el.innerHTML = '<div class="empty-hint">could not load · try again later</div>';
+        } catch (e) {
+            el.innerHTML = '<div class="empty-hint">could not load · ' + esc(String((e && e.message) || e)) + '</div>';
         }
     }
 
