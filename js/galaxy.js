@@ -58,7 +58,15 @@ class Galaxy {
             if(r<cfg.size.coreRadius){ cr=0.8; cg=0.3; cb=0.8; } else if(t<0.32){ cr=0.2; cg=0.7; cb=1.0; } else if(t<0.58){ cr=0.7; cg=0.2; cb=0.9; } else { cr=0.6; cg=0.7; cb=0.9; }
             const br=0.5+(1-r/cfg.size.diskRadius)*0.5; col[i*3]=cr*br; col[i*3+1]=cg*br; col[i*3+2]=cb*br;
         }
-        this.group.add(this._makePoints(pos, col, tex, 2.2));
+        const points = this._makePoints(pos, col, tex, 2.2);
+        points.frustumCulled = false; // borrowed stars leave the disk area; avoid frustum culling
+        this.group.add(points);
+        // For WordParticles: the disk stars it borrows to form words
+        this.diskPoints  = points;
+        this.diskPos     = pos;
+        this.diskCol     = col;
+        this.diskHomePos = pos.slice();
+        this.diskHomeCol = col.slice();
     }
 
     _createCore(tex) {

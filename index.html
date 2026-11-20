@@ -50,6 +50,20 @@
             letter-spacing: 1px;
         }
 
+        #ignite-badge {
+            position: fixed;
+            bottom: 52px; left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.35);
+            font-size: 13px;
+            letter-spacing: 2px;
+            pointer-events: none;
+            user-select: none;
+            opacity: 0;
+            transition: opacity .5s, color .3s, text-shadow .3s;
+        }
+        #ignite-badge.lit { color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.6); }
+
         .ripple {
             position: fixed;
             border-radius: 50%;
@@ -82,6 +96,7 @@
         <div id="word-count"></div>
         <div id="site-version" style="margin-top:4px;opacity:0.6;font-size:10px;letter-spacing:1px;"></div>
     </div>
+    <div id="ignite-badge"></div>
 
     <script src="js/api-config.js"></script>
     <script src="js/config.js"></script>
@@ -91,7 +106,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.5.0';
+    const SITE_VERSION = 'v0.6.0';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -237,6 +252,8 @@
         updateWordCount();
     }
 
+    let activeEntry = null; // 当前正在展示的词条目
+
     function tickWordQueue() {
         if (!wordScene || !wordCamera || wordQueue.length === 0) return;
 
@@ -245,16 +262,73 @@
             activeWord.update();
             if (!activeWord.isDone()) return;
             activeWord = null;
+            activeEntry = null;
+            updateIgniteBadge();
             queueIndex = (queueIndex + 1) % wordQueue.length;
             localStorage.setItem(QUEUE_IDX_KEY, queueIndex.toString());
         }
 
-        // 启动下一个词（带点亮档位：被点亮越多的词，粒子越大）
+        // 启动下一个词：借银河的星星成字，点亮档位决定词的大小
         const entry = wordQueue[queueIndex];
         if (entry) {
-            activeWord = new WordParticles(entry.word, wordScene, wordCamera, igniteTier(entry.ignite_count));
+            activeEntry = entry;
+            activeWord = new WordParticles(entry.word, galaxy, wordCamera, igniteTier(entry.ignite_count));
+            updateIgniteBadge();
         }
     }
+
+    /* ─── 点亮（只在首页操作）：轻点当前词 点亮/取消点亮 ─────────────────── */
+    const IGNITED_KEY = '_ignited';
+    let igniteBusy = false;
+    function getIgnitedSet() {
+        try { return new Set(JSON.parse(localStorage.getItem(IGNITED_KEY) || '[]')); } catch { return new Set(); }
+    }
+    function saveIgnitedSet(set) {
+        try { localStorage.setItem(IGNITED_KEY, JSON.stringify([...set])); } catch {}
+    }
+    function updateIgniteBadge() {
+        const el = document.getElementById('ignite-badge');
+        if (!el) return;
+        if (!activeEntry || !activeEntry.id) { el.style.opacity = '0'; return; }
+        const count = activeEntry.ignite_count || 0;
+        const lit = getIgnitedSet().has(activeEntry.id);
+        el.textContent = '✦ ' + count;
+        el.className = lit ? 'lit' : '';
+        el.style.opacity = '1';
+    }
+    async function toggleIgniteCurrent() {
+        if (igniteBusy || !activeEntry || !activeEntry.id || !activeWord) return;
+        igniteBusy = true;
+        try {
+            const res = await fetch(SB_URL + '/rest/v1/rpc/toggle_ignite', {
+                method: 'POST',
+                headers: { ...SB_HDR, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ p_word_id: activeEntry.id, p_visitor_id: vid })
+            });
+            if (!res.ok) return;
+            const out = await res.json();
+            if (!out || out.error) return;
+            activeEntry.ignite_count = out.ignite_count;
+            const set = getIgnitedSet();
+            if (out.ignited) set.add(activeEntry.id); else set.delete(activeEntry.id);
+            saveIgnitedSet(set);
+            if (activeWord) { activeWord.setTier(igniteTier(out.ignite_count)); activeWord.igniteFlash(); }
+            updateIgniteBadge();
+        } catch {} finally { igniteBusy = false; }
+    }
+
+    // 轻点（区别于拖动旋转）才触发点亮；点链接不触发
+    let _pDown = null;
+    document.addEventListener('pointerdown', e => { _pDown = { x: e.clientX, y: e.clientY, t: Date.now() }; });
+    document.addEventListener('pointerup', e => {
+        if (!_pDown) return;
+        const dx = e.clientX - _pDown.x, dy = e.clientY - _pDown.y;
+        const dt = Date.now() - _pDown.t;
+        _pDown = null;
+        if (dx * dx + dy * dy > 64 || dt > 500) return;
+        if (e.target && e.target.closest && e.target.closest('a')) return;
+        toggleIgniteCurrent();
+    });
 
     /* ─── 等待 main.js 完成初始化后接入 ─────────────────────────────────── */
     window.addEventListener('load', () => {
