@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Galaxy · linzefei</title>
+    <meta name="description" content="linzefei 的个人词语星系：把想留住的词放进星系里，访客可以点亮它们。">
+    <meta property="og:title" content="Galaxy · linzefei">
+    <meta property="og:description" content="一个用星星组成的个人词语星系。词被点亮得越多，就越大越亮。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://linzefei.com/">
+    <meta name="twitter:card" content="summary">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -30,7 +36,7 @@
             position: fixed;
             bottom: 24px; left: 50%;
             transform: translateX(-50%);
-            color: rgba(255,255,255,0.22);
+            color: rgba(255,255,255,0.38);
             font-size: 11px;
             letter-spacing: 3px;
             text-transform: uppercase;
@@ -106,7 +112,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.6.1';
+    const SITE_VERSION = 'v0.7.0';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -135,8 +141,12 @@
             // 检测国家（ip-api.com 免费，无需 key）
             let country = null, countryCode = null;
             try {
-                const geo = await fetch('https://ip-api.com/json?fields=country,countryCode', { cache: 'force-cache' });
-                if (geo.ok) { const g = await geo.json(); country = g.country; countryCode = g.countryCode; }
+                const geo = await fetch('https://api.country.is/', { cache: 'force-cache' });
+                if (geo.ok) {
+                    const g = await geo.json();
+                    countryCode = g.country || null;
+                    if (countryCode) { try { country = new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode); } catch {} }
+                }
             } catch {}
             await fetch(SB_URL + '/rest/v1/visitors', {
                 method: 'POST',
@@ -216,17 +226,10 @@
     async function fetchWords() {
         let dbEntries = [];
         try {
-            // 先带 ignite_count 查；若 ignite.sql 还没在 Supabase 执行（无此列），降级为基础查询
-            let res = await fetch(
-                SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
+            const res = await fetch(
+                SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
-            if (!res.ok) {
-                res = await fetch(
-                    SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order&approved=eq.true&order=sort_order.asc,created_at.asc&limit=200',
-                    { headers: SB_HDR }
-                );
-            }
             if (res.ok) {
                 const rows = await res.json();
                 dbEntries = rows.map(r => ({ word: r.word, id: r.id, ignite_count: r.ignite_count || 0 }));
@@ -300,10 +303,11 @@
         if (igniteBusy || !activeEntry || !activeEntry.id || !activeWord) return;
         igniteBusy = true;
         try {
-            const res = await fetch(SB_URL + '/rest/v1/rpc/toggle_ignite', {
+            await ensureVisitorRegistered();
+            const res = await fetch(SB_URL + '/rest/v1/rpc/toggle_ignite_v2', {
                 method: 'POST',
                 headers: { ...SB_HDR, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ p_word_id: activeEntry.id, p_visitor_id: vid })
+                body: JSON.stringify({ p_word_id: activeEntry.id, p_visitor_id: vid, p_token: tok })
             });
             if (!res.ok) return;
             const out = await res.json();

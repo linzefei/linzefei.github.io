@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Words · linzefei</title>
+    <meta name="description" content="linzefei 的词语星系里的全部词，以及每个词被点亮的次数。">
+    <meta property="og:title" content="Words · linzefei">
+    <meta property="og:description" content="星系里的全部词。点亮在首页完成：轻点正在展示的词即可。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://linzefei.com/words.html">
+    <meta name="twitter:card" content="summary">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -280,8 +286,12 @@
             const hash = await sha256hex(tok);
             let country = null, countryCode = null;
             try {
-                const g = await fetch('https://ip-api.com/json?fields=country,countryCode', { cache: 'force-cache' });
-                if (g.ok) { const j = await g.json(); country = j.country; countryCode = j.countryCode; }
+                const g = await fetch('https://api.country.is/', { cache: 'force-cache' });
+                if (g.ok) {
+                    const j = await g.json();
+                    countryCode = j.country || null;
+                    if (countryCode) { try { country = new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode); } catch {} }
+                }
             } catch {}
             await fetch(SB_URL + '/rest/v1/visitors', {
                 method: 'POST',
@@ -375,16 +385,10 @@
         let approvedSet = new Set();
         let igniteMap = {};
         try {
-            let res = await fetch(
+            const res = await fetch(
                 SB_URL + '/rest/v1/visitor_words?select=word,ignite_count&approved=eq.true&limit=500',
                 { headers: SB_HDR }
             );
-            if (!res.ok) { // ignite.sql 未执行时降级
-                res = await fetch(
-                    SB_URL + '/rest/v1/visitor_words?select=word&approved=eq.true&limit=500',
-                    { headers: SB_HDR }
-                );
-            }
             if (res.ok) (await res.json()).forEach(r => { approvedSet.add(r.word); igniteMap[r.word] = r.ignite_count || 0; });
         } catch {}
 
@@ -396,7 +400,7 @@
                     <div class="my-word-text">${esc(word)}</div>
                     ${igniteMap[word] ? `<span class="my-word-ignite">✦ ${igniteMap[word]}</span>` : ''}
                     <span class="status-pill ${approved ? 'pill-ok' : 'pill-pending'}">
-                        ${approved ? '✓ live' : 'pending'}
+                        ${approved ? '✓ live' : 'pending review'}
                     </span>
                     ${ts ? `<div class="my-word-time">${reltime(ts)}</div>` : ''}
                 </div>`;
@@ -412,16 +416,10 @@
     async function loadAllWords() {
         const el = document.getElementById('all-word-list');
         try {
-            let res = await fetch(
+            const res = await fetch(
                 SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
-            if (!res.ok) { // ignite.sql 未执行时降级为基础查询，词列表照常显示
-                res = await fetch(
-                    SB_URL + '/rest/v1/visitor_words?select=id,word,created_at,visitor_id,source&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
-                    { headers: SB_HDR }
-                );
-            }
             if (!res.ok) throw new Error();
             const words = await res.json();
 
