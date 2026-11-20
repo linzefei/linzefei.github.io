@@ -11,7 +11,7 @@ class WordParticles {
         this.tier = tier || 0;
         this.scaleFactor = [1, 1.15, 1.3, 1.45][this.tier] || 1;
         this.phase = 'assembling'; this.tick = 0;
-        this.T_ASSEMBLE = 120; this.T_HOLD = 220; this.T_DISPERSE = 110;
+        this.T_ASSEMBLE = 120; this.T_HOLD = 300; this.T_DISPERSE = 110;
         this.flash = 0;
         this._v = new THREE.Vector3();
         this._init();
@@ -43,12 +43,12 @@ class WordParticles {
         this.n = pixels.length;
         if (this.n === 0 || !this.galaxy || !this.galaxy.diskPoints) { this.phase = 'done'; return; }
 
-        // 在盘面上均匀抽样借星（随机起点，避免每次都是同一批）
+        // 借连续一段盘面星星（盘面生成顺序本身是随机的，连续段在空间上也是散布的；
+        // 连续段同时让高亮层可以用 drawRange 只重绘这批星）
         const total = this.galaxy.diskHomePos.length / 3;
         this.idx = new Uint32Array(this.n);
-        const stride = total / this.n;
-        const offset = Math.random() * total;
-        for (let i = 0; i < this.n; i++) this.idx[i] = Math.floor(offset + i * stride) % total;
+        this.startIdx = Math.floor(Math.random() * Math.max(1, total - this.n));
+        for (let i = 0; i < this.n; i++) this.idx[i] = this.startIdx + i;
 
         // 单位目标坐标（-0.5..0.5），每帧按当前档位缩放成实际尺寸
         this.unit = new Float32Array(this.n * 2);
@@ -57,8 +57,8 @@ class WordParticles {
             this.unit[i*2] = p.nx; this.unit[i*2+1] = p.ny;
             const t = Math.random();
             // 配色：亮金色 (#FFD700) 为主，少量高亮青色 (#00FFFF) 点缀
-            if (t < 0.8) { this.wordCol[i*3]=1.0; this.wordCol[i*3+1]=0.85; this.wordCol[i*3+2]=0.1; } // Gold
-            else { this.wordCol[i*3]=0.1; this.wordCol[i*3+1]=1.0; this.wordCol[i*3+2]=0.9; } // Neon Cyan
+            if (t < 0.8) { this.wordCol[i*3]=1.5; this.wordCol[i*3+1]=1.28; this.wordCol[i*3+2]=0.15; } // Gold
+            else { this.wordCol[i*3]=0.15; this.wordCol[i*3+1]=1.5; this.wordCol[i*3+2]=1.35; } // Neon Cyan
         });
         this.delay = new Float32Array(this.n);
         for (let i = 0; i < this.n; i++) this.delay[i] = Math.random() * 0.4;
@@ -68,6 +68,24 @@ class WordParticles {
         this.anchor.position.set(0, 105, 0);
         this.galaxy.scene.add(this.anchor);
         this.geo = this.galaxy.diskPoints.geometry;
+
+        // 高亮层：与盘面共享同一份位置/颜色属性，只重绘借出的这一段星星，
+        // 用更大的发光点把词凸显出来（盘面上的原星仍照常渲染，两层叠加发光）
+        this.wordGeo = new THREE.BufferGeometry();
+        this.wordGeo.setAttribute('position', this.geo.attributes.position);
+        this.wordGeo.setAttribute('color', this.geo.attributes.color);
+        this.wordGeo.setDrawRange(this.startIdx, this.n);
+        const matOpts = { size: 4.4, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true };
+        if (this.galaxy.starTexture) matOpts.map = this.galaxy.starTexture;
+        this.wordMat = new THREE.PointsMaterial(matOpts);
+        this.wordPoints = new THREE.Points(this.wordGeo, this.wordMat);
+        this.wordPoints.frustumCulled = false;
+        this.galaxy.group.add(this.wordPoints);
+    }
+
+    extendHold(frames) {
+        // 点亮后让词多停留一会儿，给用户看清反馈
+        if (this.phase === 'holding') this.holdExtra = (this.holdExtra || 0) + frames;
     }
 
     setTier(tier) {
@@ -90,6 +108,11 @@ class WordParticles {
         this.geo.attributes.position.needsUpdate = true;
         this.geo.attributes.color.needsUpdate = true;
         if (this.anchor) { this.galaxy.scene.remove(this.anchor); this.anchor = null; }
+        if (this.wordPoints) {
+            this.galaxy.group.remove(this.wordPoints);
+            this.wordMat.dispose(); // 注意：wordGeo 与盘面共享属性，不能 dispose
+            this.wordPoints = null;
+        }
     }
 
     update() {
@@ -144,8 +167,13 @@ class WordParticles {
         this.geo.attributes.position.needsUpdate = true;
         this.geo.attributes.color.needsUpdate = true;
 
+        if (this.wordMat) {
+            this.wordMat.opacity = this.phase === 'assembling' ? rawT
+                : this.phase === 'dispersing' ? 1 - rawT : 1;
+        }
+
         if (this.phase === 'assembling' && rawT >= 1) { this.phase = 'holding'; this.tick = 0; }
-        else if (this.phase === 'holding' && this.tick >= this.T_HOLD) { this.phase = 'dispersing'; this.tick = 0; }
+        else if (this.phase === 'holding' && this.tick >= this.T_HOLD + (this.holdExtra || 0)) { this.phase = 'dispersing'; this.tick = 0; }
         else if (this.phase === 'dispersing' && rawT >= 1) { this._restore(); this.phase = 'done'; }
     }
 

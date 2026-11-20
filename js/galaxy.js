@@ -103,6 +103,7 @@ class Galaxy {
 
     init() {
         const sTex=this._createStarTexture(), nTex=this._createNebulaTexture();
+        this.starTexture = sTex; // 供 WordParticles 的高亮层复用
         this._createBackground(sTex); this._createDisk(sTex); this._createNebula(nTex); this._createCore(sTex); this._createCentralGlow();
         this.group.rotation.x = -0.22;
     }

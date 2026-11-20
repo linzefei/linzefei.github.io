@@ -106,7 +106,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.6.0';
+    const SITE_VERSION = 'v0.6.1';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -312,7 +312,7 @@
             const set = getIgnitedSet();
             if (out.ignited) set.add(activeEntry.id); else set.delete(activeEntry.id);
             saveIgnitedSet(set);
-            if (activeWord) { activeWord.setTier(igniteTier(out.ignite_count)); activeWord.igniteFlash(); }
+            if (activeWord) { activeWord.setTier(igniteTier(out.ignite_count)); activeWord.igniteFlash(); activeWord.extendHold(240); }
             updateIgniteBadge();
         } catch {} finally { igniteBusy = false; }
     }
