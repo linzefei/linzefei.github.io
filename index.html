@@ -70,6 +70,19 @@
         }
         #ignite-badge.lit { color: #ffd700; text-shadow: 0 0 10px rgba(255,215,0,0.6); }
 
+        /* ── 偶遇旧词：左下角悄悄浮出的一颗旧星 ── */
+        #encounter {
+            position: fixed;
+            left: 24px; bottom: 22px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 1.6s;
+            user-select: none;
+        }
+        #encounter .enc-word { color: rgba(255,255,255,0.5); font-size: 15px; letter-spacing: 2px; transition: color .3s; }
+        #encounter .enc-date { color: rgba(255,255,255,0.25); font-size: 10px; letter-spacing: 1px; margin-top: 3px; }
+        #encounter:hover .enc-word { color: rgba(255,215,0,0.85); }
+
         .ripple {
             position: fixed;
             border-radius: 50%;
@@ -103,6 +116,7 @@
         <div id="site-version" style="margin-top:4px;opacity:0.6;font-size:10px;letter-spacing:1px;"></div>
     </div>
     <div id="ignite-badge"></div>
+    <div id="encounter"><div class="enc-word"></div><div class="enc-date"></div></div>
 
     <script src="js/api-config.js"></script>
     <script src="js/config.js"></script>
@@ -112,7 +126,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.7.0';
+    const SITE_VERSION = 'v0.8.0';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -227,12 +241,12 @@
         let dbEntries = [];
         try {
             const res = await fetch(
-                SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order,ignite_count&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
+                SB_URL + '/rest/v1/visitor_words?select=id,word,sort_order,ignite_count,created_at&approved=eq.true&order=sort_order.asc,created_at.asc&limit=300',
                 { headers: SB_HDR }
             );
             if (res.ok) {
                 const rows = await res.json();
-                dbEntries = rows.map(r => ({ word: r.word, id: r.id, ignite_count: r.ignite_count || 0 }));
+                dbEntries = rows.map(r => ({ word: r.word, id: r.id, ignite_count: r.ignite_count || 0, created_at: r.created_at }));
             }
         } catch {}
 
@@ -321,6 +335,34 @@
         } catch {} finally { igniteBusy = false; }
     }
 
+    /* ─── 偶遇旧词：打开首页时，左下角浮出一颗以前的星 ─────────────────── */
+    function setupEncounter() {
+        const el = document.getElementById('encounter');
+        if (!el) return;
+        const pool = wordQueue.map((e, i) => ({ e, i })).filter(x => x.e.created_at);
+        if (pool.length < 3) return;
+        let pick = pool[Math.floor(Math.random() * pool.length)];
+        let guard = 0;
+        while (pick.i === queueIndex && guard++ < 8) pick = pool[Math.floor(Math.random() * pool.length)];
+        el.querySelector('.enc-word').textContent = pick.e.word;
+        el.querySelector('.enc-date').textContent =
+            new Date(pick.e.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        el.title = 'see it in the galaxy';
+        el.onclick = () => jumpToWord(pick.i);
+        setTimeout(() => { el.style.opacity = '1'; }, 5000);
+    }
+    function jumpToWord(idx) {
+        if (!wordQueue.length || (idx === queueIndex && activeWord)) return;
+        if (activeWord) {
+            // 让当前词立即散场，队列指针落到目标词上
+            queueIndex = (idx - 1 + wordQueue.length) % wordQueue.length;
+            activeWord.phase = 'dispersing';
+            activeWord.tick = activeWord.T_DISPERSE;
+        } else {
+            queueIndex = idx;
+        }
+    }
+
     // 轻点（区别于拖动旋转）才触发点亮；点链接不触发
     let _pDown = null;
     document.addEventListener('pointerdown', e => { _pDown = { x: e.clientX, y: e.clientY, t: Date.now() }; });
@@ -330,7 +372,7 @@
         const dt = Date.now() - _pDown.t;
         _pDown = null;
         if (dx * dx + dy * dy > 64 || dt > 500) return;
-        if (e.target && e.target.closest && e.target.closest('a')) return;
+        if (e.target && e.target.closest && (e.target.closest('a') || e.target.closest('#encounter'))) return;
         toggleIgniteCurrent();
     });
 
@@ -343,6 +385,7 @@
             wordScene  = scene;   // 来自 main.js 全局变量
             wordCamera = camera;
             fetchWords().then(() => {
+                setupEncounter();
                 // 延迟 1s 再开始，让银河先渲染出来
                 setTimeout(() => {
                     tickWordQueue();
