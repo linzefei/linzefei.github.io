@@ -108,7 +108,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
 </head>
 <body>
-    <div id="logo">linzefei <a href="/words.html" style="font-size:11px;letter-spacing:2px;color:rgba(140,200,255,0.3);text-decoration:none;margin-left:14px;vertical-align:middle;" onmouseover="this.style.color='rgba(140,200,255,0.8)'" onmouseout="this.style.color='rgba(140,200,255,0.3)'">words →</a></div>
+    <div id="logo">linzefei <a href="/words.html" style="pointer-events:auto;font-size:11px;letter-spacing:2px;color:rgba(140,200,255,0.3);text-decoration:none;margin-left:14px;vertical-align:middle;" onmouseover="this.style.color='rgba(140,200,255,0.8)'" onmouseout="this.style.color='rgba(140,200,255,0.3)'">words →</a></div>
     <div id="hint">drag to explore &nbsp;·&nbsp; scroll to zoom &nbsp;·&nbsp; click to ignite</div>
     <div id="stats">
         <div id="particle-count"></div>
@@ -126,7 +126,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.8.0';
+    const SITE_VERSION = 'v0.8.1';
 
     /* ─── 游客 ID + 安全 Token ───────────────────────────────────────────── */
     let vid = localStorage.getItem('_vid');
@@ -356,8 +356,7 @@
         if (activeWord) {
             // 让当前词立即散场，队列指针落到目标词上
             queueIndex = (idx - 1 + wordQueue.length) % wordQueue.length;
-            activeWord.phase = 'dispersing';
-            activeWord.tick = activeWord.T_DISPERSE;
+            activeWord.rushDisperse();
         } else {
             queueIndex = idx;
         }

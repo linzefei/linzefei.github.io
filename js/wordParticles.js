@@ -10,8 +10,11 @@ class WordParticles {
         this.word = word; this.galaxy = galaxy; this.camera = camera;
         this.tier = tier || 0;
         this.scaleFactor = [1, 1.15, 1.3, 1.45][this.tier] || 1;
-        this.phase = 'assembling'; this.tick = 0;
-        this.T_ASSEMBLE = 120; this.T_HOLD = 300; this.T_DISPERSE = 110;
+        this.phase = 'assembling';
+        // 计时改用真实秒数（原为帧数：120/300/110 帧 @60fps），
+        // 低帧率设备上词的成字/停留/散场节奏与高帧率一致，不再拖慢
+        this.tPhase = 0; this._lastNow = null;
+        this.T_ASSEMBLE = 2.0; this.T_HOLD = 5.0; this.T_DISPERSE = 110 / 60;
         this.flash = 0;
         this._v = new THREE.Vector3();
         this._init();
@@ -84,8 +87,13 @@ class WordParticles {
     }
 
     extendHold(frames) {
-        // 点亮后让词多停留一会儿，给用户看清反馈
-        if (this.phase === 'holding') this.holdExtra = (this.holdExtra || 0) + frames;
+        // 点亮后让词多停留一会儿，给用户看清反馈（入参仍按帧数 @60fps 折算成秒）
+        if (this.phase === 'holding') this.holdExtra = (this.holdExtra || 0) + frames / 60;
+    }
+
+    rushDisperse() {
+        // 偶遇旧词跳转：让当前词立刻收尾，下一帧就开始组下一个词
+        if (this.phase !== 'done') { this.phase = 'dispersing'; this.tPhase = this.T_DISPERSE; }
     }
 
     setTier(tier) {
@@ -117,13 +125,17 @@ class WordParticles {
 
     update() {
         if (this.phase === 'done' || !this.geo) return;
-        this.tick++;
-        if (this.flash > 0.01) this.flash *= 0.94; else this.flash = 0;
+        const now = performance.now();
+        let dt = this._lastNow == null ? 0 : (now - this._lastNow) / 1000;
+        this._lastNow = now;
+        if (dt > 0.5) dt = 0.5; // 切后台回来时单帧步长封顶，避免词瞬间跳完；0.5s 足以覆盖低帧率设备的正常帧间隔
+        this.tPhase += dt;
+        if (this.flash > 0.01) this.flash *= Math.pow(0.94, dt * 60); else this.flash = 0;
 
         let rawT;
-        if (this.phase === 'assembling')   rawT = Math.min(1, this.tick / this.T_ASSEMBLE);
+        if (this.phase === 'assembling')   rawT = Math.min(1, this.tPhase / this.T_ASSEMBLE);
         else if (this.phase === 'holding') rawT = 1;
-        else                               rawT = Math.min(1, this.tick / this.T_DISPERSE);
+        else                               rawT = Math.min(1, this.tPhase / this.T_DISPERSE);
 
         if (this.camera) this.anchor.quaternion.copy(this.camera.quaternion);
         this.galaxy.scene.updateMatrixWorld();
@@ -172,8 +184,8 @@ class WordParticles {
                 : this.phase === 'dispersing' ? 1 - rawT : 1;
         }
 
-        if (this.phase === 'assembling' && rawT >= 1) { this.phase = 'holding'; this.tick = 0; }
-        else if (this.phase === 'holding' && this.tick >= this.T_HOLD + (this.holdExtra || 0)) { this.phase = 'dispersing'; this.tick = 0; }
+        if (this.phase === 'assembling' && rawT >= 1) { this.phase = 'holding'; this.tPhase = 0; }
+        else if (this.phase === 'holding' && this.tPhase >= this.T_HOLD + (this.holdExtra || 0)) { this.phase = 'dispersing'; this.tPhase = 0; }
         else if (this.phase === 'dispersing' && rawT >= 1) { this._restore(); this.phase = 'done'; }
     }
 
