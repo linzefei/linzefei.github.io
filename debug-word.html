@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>debug</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head><body style="background:#111;color:#0f0">
+<pre id="out">running...</pre>
+<script>// Galaxy Configuration - Safe Mode
+const GALAXY_CONFIG = {
+    particles: {
+        disk:       12000,   // 大幅削减
+        core:       3000,    
+        halo:       1000,    
+        background: 2000,    
+        nebula:     600,     
+    },
+    size: {
+        diskRadius: 500,
+        coreRadius: 40,
+    },
+    arms: {
+        count: 3,
+        windingFactor: 0.8,
+        spread: 0.35,
+    },
+    rotation: {
+        disk:  0.00012, // 稍微快一点点，让灵动感补足数量
+    },
+    camera: {
+        fov:  60,
+        near: 1,
+        far:  5000,
+        position: { x: 0, y: 520, z: 980 },
+    },
+};
+</script>
+<script>/**
+ * Galaxy - 3D Spiral Galaxy Animation
+ */
+class Galaxy {
+    constructor(scene) {
+        this.scene = scene;
+        this.group = new THREE.Group();
+        scene.add(this.group);
+        this.time = 0;
+        this.shootingStars = [];
+        this.shootingStarTimer = 0;
+        this.shakeLevel = 0; // 震动强度 [0, 1]
+    }
+
+    _createStarTexture() {
+        const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+        const ctx = canvas.getContext('2d'); const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(0.25, 'rgba(255,255,255,0.5)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(canvas);
+    }
+
+    _createNebulaTexture() {
+        const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128;
+        const ctx = canvas.getContext('2d'); const grad = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(255,255,255,0.6)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(canvas);
+    }
+
+    _gauss() {
+        let u=0, v=0; while(u===0) u=Math.random(); while(v===0) v=Math.random();
+        return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+    }
+
+    _makePoints(pos, col, tex, size, opacity) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        return new THREE.Points(geo, new THREE.PointsMaterial({ size, map: tex, vertexColors: true, transparent: true, opacity: opacity||1, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
+    }
+
+    _createBackground(tex) {
+        const n = GALAXY_CONFIG.particles.background; const pos = new Float32Array(n*3), col = new Float32Array(n*3);
+        for(let i=0; i<n; i++){
+            const r=2500+Math.random()*2500, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+            pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.sin(ph)*Math.sin(th); pos[i*3+2]=r*Math.cos(ph);
+            const b=0.2+Math.random()*0.4; col[i*3]=b; col[i*3+1]=b; col[i*3+2]=b*1.2;
+        }
+        this.scene.add(this._makePoints(pos, col, tex, 1.2, 0.8));
+    }
+
+    _createDisk(tex) {
+        const n=GALAXY_CONFIG.particles.disk, cfg=GALAXY_CONFIG; const pos=new Float32Array(n*3), col=new Float32Array(n*3);
+        for(let i=0; i<n; i++){
+            let r=Math.random()<0.18?Math.random()*cfg.size.coreRadius:cfg.size.coreRadius+Math.pow(Math.random(),1.1)*(cfg.size.diskRadius-cfg.size.coreRadius);
+            const th=(Math.PI*2/cfg.arms.count)*(i%cfg.arms.count)+cfg.arms.windingFactor*Math.log(r/cfg.size.coreRadius+1)+this._gauss()*(cfg.arms.spread*(0.15+(1-r/cfg.size.diskRadius)*0.5));
+            pos[i*3]=Math.cos(th)*r; pos[i*3+2]=Math.sin(th)*r; pos[i*3+1]=this._gauss()*Math.max(2,(1-r/cfg.size.diskRadius)*40+4)*0.4;
+            const t=Math.random(); let cr,cg,cb;
+            if(r<cfg.size.coreRadius){ cr=0.8; cg=0.3; cb=0.8; } else if(t<0.32){ cr=0.2; cg=0.7; cb=1.0; } else if(t<0.58){ cr=0.7; cg=0.2; cb=0.9; } else { cr=0.6; cg=0.7; cb=0.9; }
+            const br=0.5+(1-r/cfg.size.diskRadius)*0.5; col[i*3]=cr*br; col[i*3+1]=cg*br; col[i*3+2]=cb*br;
+        }
+        const points = this._makePoints(pos, col, tex, 2.2);
+        points.frustumCulled = false; // borrowed stars leave the disk area; avoid frustum culling
+        this.group.add(points);
+        // For WordParticles: the disk stars it borrows to form words
+        this.diskPoints  = points;
+        this.diskPos     = pos;
+        this.diskCol     = col;
+        this.diskHomePos = pos.slice();
+        this.diskHomeCol = col.slice();
+    }
+
+    _createCore(tex) {
+        const n=GALAXY_CONFIG.particles.core, CR=GALAXY_CONFIG.size.coreRadius; const pos=new Float32Array(n*3), col=new Float32Array(n*3);
+        for(let i=0; i<n; i++){
+            const r=Math.abs(this._gauss())*CR*0.45, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+            pos[i*3]=r*Math.sin(ph)*Math.cos(th); pos[i*3+1]=r*Math.sin(ph)*Math.sin(th)*0.55; pos[i*3+2]=r*Math.cos(ph);
+            const br=0.6+Math.random()*0.3; col[i*3]=br*0.8; col[i*3+1]=br*0.3; col[i*3+2]=br;
+        }
+        this.group.add(this._makePoints(pos, col, tex, 3.5));
+    }
+
+    _createNebula(tex) {
+        const n=GALAXY_CONFIG.particles.nebula, cfg=GALAXY_CONFIG; const pos=new Float32Array(n*3), col=new Float32Array(n*3);
+        for(let i=0; i<n; i++){
+            const r=cfg.size.coreRadius*1.5+Math.random()*(cfg.size.diskRadius*0.85-cfg.size.coreRadius);
+            const th=(Math.PI*2/cfg.arms.count)*Math.floor(Math.random()*cfg.arms.count)+cfg.arms.windingFactor*Math.log(r/cfg.size.coreRadius+1)+this._gauss()*0.14;
+            pos[i*3]=Math.cos(th)*r+this._gauss()*18; pos[i*3+1]=this._gauss()*8; pos[i*3+2]=Math.sin(th)*r+this._gauss()*18;
+            const br=0.1+Math.random()*0.15;
+            if(Math.random()<0.4){ col[i*3]=br*0.1; col[i*3+1]=br*0.7; col[i*3+2]=br; } else if(Math.random()<0.7){ col[i*3]=br; col[i*3+1]=br*0.1; col[i*3+2]=br*0.6; } else { col[i*3]=br*0.3; col[i*3+1]=br*0.1; col[i*3+2]=br*0.8; }
+        }
+        this.group.add(this._makePoints(pos, col, tex, 36, 0.5));
+    }
+
+    _createCentralGlow() {
+        const canvas=document.createElement('canvas'); canvas.width=256; canvas.height=256;
+        const ctx=canvas.getContext('2d'); const grad=ctx.createRadialGradient(128,128,0,128,128,128);
+        grad.addColorStop(0, 'rgba(180, 80, 255, 0.15)'); grad.addColorStop(0.2, 'rgba(100, 50, 255, 0.05)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle=grad; ctx.fillRect(0,0,256,256);
+        const tex=new THREE.CanvasTexture(canvas);
+        this.coreSprite=new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
+        this.coreSprite.scale.set(160,160,1); this.group.add(this.coreSprite);
+    }
+
+    init() {
+        const sTex=this._createStarTexture(), nTex=this._createNebulaTexture();
+        this.starTexture = sTex; // 供 WordParticles 的高亮层复用
+        this._createBackground(sTex); this._createDisk(sTex); this._createNebula(nTex); this._createCore(sTex); this._createCentralGlow();
+        this.group.rotation.x = -0.22;
+    }
+
+    // 触发震动
+    triggerVibration() {
+        this.shakeLevel = 1.0;
+    }
+
+    _spawnShootingStar() {
+        const start = new THREE.Vector3((Math.random()-0.5)*2400, (Math.random()-0.5)*600, (Math.random()-0.5)*2400);
+        const dir = new THREE.Vector3((Math.random()-0.5)*0.6-start.x*0.001, (Math.random()-0.5)*0.2-start.y*0.001, (Math.random()-0.5)*0.6-start.z*0.001).normalize();
+        const geo = new THREE.BufferGeometry().setFromPoints([start, start.clone().sub(dir.clone().multiplyScalar(120))]);
+        const mat = new THREE.LineBasicMaterial({ color: 0x88ddff, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+        const line = new THREE.Line(geo, mat); this.scene.add(line);
+        this.shootingStars.push({ line, geo, mat, dir: dir.multiplyScalar(16), life: 1.0 });
+    }
+
+    _updateShootingStars() {
+        for(let i=this.shootingStars.length-1; i>=0; i--){
+            const s=this.shootingStars[i]; s.life-=0.025; s.mat.opacity=Math.max(0, s.life);
+            const p=s.geo.attributes.position.array; for(let j=0; j<6; j+=3){ p[j]+=s.dir.x; p[j+1]+=s.dir.y; p[j+2]+=s.dir.z; }
+            s.geo.attributes.position.needsUpdate=true;
+            if(s.life<=0){ this.scene.remove(s.line); s.geo.dispose(); s.mat.dispose(); this.shootingStars.splice(i,1); }
+        }
+    }
+
+    update() {
+        this.time += 0.016;
+        this.group.rotation.y += GALAXY_CONFIG.rotation.disk;
+
+        // 核心脉冲
+        if(this.coreSprite) this.coreSprite.scale.set(160*(1+Math.sin(this.time*1.4)*0.06), 160*(1+Math.sin(this.time*1.4)*0.06), 1);
+
+        // 空间震动逻辑
+        if (this.shakeLevel > 0) {
+            const s = this.shakeLevel * 6; // 震幅
+            this.group.position.set((Math.random()-0.5)*s, (Math.random()-0.5)*s, (Math.random()-0.5)*s);
+            this.shakeLevel *= 0.9; // 衰减
+            if (this.shakeLevel < 0.01) { this.shakeLevel = 0; this.group.position.set(0,0,0); }
+        }
+
+        if(this.shootingStarTimer++ > 250*Math.random()){ this.shootingStarTimer=0; this._spawnShootingStar(); }
+        this._updateShootingStars();
+    }
+
+    dispose() {
+        this.group.children.forEach(c => { if(c.geometry)c.geometry.dispose(); if(c.material)c.material.dispose(); });
+        this.scene.remove(this.group);
+    }
+}
+</script>
+<script>/**
+ * WordParticles – 借用银河盘面的真实星星聚合成字
+ *
+ * 不再凭空生成粒子：从 Galaxy 盘面借出一批真实星星，飞到镜头前组成词，
+ * 展示结束后原样飞回它们在银河中的位置。借用期间星星颜色渐变为金/青，
+ * 归位时恢复原色。点亮档位决定词的整体大小（被点亮越多，词越大）。
+ */
+class WordParticles {
+    constructor(word, galaxy, camera, tier) {
+        this.word = word; this.galaxy = galaxy; this.camera = camera;
+        this.tier = tier || 0;
+        this.scaleFactor = [1, 1.15, 1.3, 1.45][this.tier] || 1;
+        this.phase = 'assembling'; this.tick = 0;
+        this.T_ASSEMBLE = 120; this.T_HOLD = 300; this.T_DISPERSE = 110;
+        this.flash = 0;
+        this._v = new THREE.Vector3();
+        this._init();
+    }
+
+    _sampleLetters(word) {
+        const FONT_SIZE = 96; const PAD = 20;
+        const tmp = document.createElement('canvas'); const tc = tmp.getContext('2d');
+        tc.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
+        const textW = tc.measureText(word).width;
+        const W = Math.ceil(textW + PAD * 2), H = FONT_SIZE + PAD * 2;
+        const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fff';
+        ctx.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
+        ctx.fillText(word, PAD, FONT_SIZE + PAD * 0.4);
+        const data = ctx.getImageData(0, 0, W, H).data, pixels = [];
+        for (let y=0; y<H; y+=2) { for (let x=0; x<W; x+=2) { if (data[(y*W+x)*4+3]>100) pixels.push({nx: x/W-0.5, ny: -(y/H-0.5)}); } }
+        return pixels;
+    }
+
+    _init() {
+        let pixels = this._sampleLetters(this.word);
+        const MAX = 2600; // 单个词最多借 2600 颗星
+        if (pixels.length > MAX) {
+            const step = pixels.length / MAX, picked = [];
+            for (let i = 0; i < MAX; i++) picked.push(pixels[Math.floor(i * step)]);
+            pixels = picked;
+        }
+        this.n = pixels.length;
+        if (this.n === 0 || !this.galaxy || !this.galaxy.diskPoints) { this.phase = 'done'; return; }
+
+        // 借连续一段盘面星星（盘面生成顺序本身是随机的，连续段在空间上也是散布的；
+        // 连续段同时让高亮层可以用 drawRange 只重绘这批星）
+        const total = this.galaxy.diskHomePos.length / 3;
+        this.idx = new Uint32Array(this.n);
+        this.startIdx = Math.floor(Math.random() * Math.max(1, total - this.n));
+        for (let i = 0; i < this.n; i++) this.idx[i] = this.startIdx + i;
+
+        // 单位目标坐标（-0.5..0.5），每帧按当前档位缩放成实际尺寸
+        this.unit = new Float32Array(this.n * 2);
+        this.wordCol = new Float32Array(this.n * 3);
+        pixels.forEach((p, i) => {
+            this.unit[i*2] = p.nx; this.unit[i*2+1] = p.ny;
+            const t = Math.random();
+            // 配色：亮金色 (#FFD700) 为主，少量高亮青色 (#00FFFF) 点缀
+            if (t < 0.8) { this.wordCol[i*3]=1.5; this.wordCol[i*3+1]=1.28; this.wordCol[i*3+2]=0.15; } // Gold
+            else { this.wordCol[i*3]=0.15; this.wordCol[i*3+1]=1.5; this.wordCol[i*3+2]=1.35; } // Neon Cyan
+        });
+        this.delay = new Float32Array(this.n);
+        for (let i = 0; i < this.n; i++) this.delay[i] = Math.random() * 0.4;
+
+        // 词的锚点：挂在场景中，每帧朝向相机（与旧版位置一致）
+        this.anchor = new THREE.Object3D();
+        this.anchor.position.set(0, 105, 0);
+        this.galaxy.scene.add(this.anchor);
+        this.geo = this.galaxy.diskPoints.geometry;
+
+        // 高亮层：与盘面共享同一份位置/颜色属性，只重绘借出的这一段星星，
+        // 用更大的发光点把词凸显出来（盘面上的原星仍照常渲染，两层叠加发光）
+        this.wordGeo = new THREE.BufferGeometry();
+        this.wordGeo.setAttribute('position', this.geo.attributes.position);
+        this.wordGeo.setAttribute('color', this.geo.attributes.color);
+        this.wordGeo.setDrawRange(this.startIdx, this.n);
+        const matOpts = { size: 4.4, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true };
+        if (this.galaxy.starTexture) matOpts.map = this.galaxy.starTexture;
+        this.wordMat = new THREE.PointsMaterial(matOpts);
+        this.wordPoints = new THREE.Points(this.wordGeo, this.wordMat);
+        this.wordPoints.frustumCulled = false;
+        this.galaxy.group.add(this.wordPoints);
+    }
+
+    extendHold(frames) {
+        // 点亮后让词多停留一会儿，给用户看清反馈
+        if (this.phase === 'holding') this.holdExtra = (this.holdExtra || 0) + frames;
+    }
+
+    setTier(tier) {
+        this.tier = tier || 0;
+        this.scaleFactor = [1, 1.15, 1.3, 1.45][this.tier] || 1;
+    }
+
+    igniteFlash() { this.flash = 1; }
+
+    _restore() {
+        // 把借出的星星精确还原到原始位置与颜色
+        const pos = this.geo.attributes.position.array;
+        const col = this.geo.attributes.color.array;
+        const home = this.galaxy.diskHomePos, homeCol = this.galaxy.diskHomeCol;
+        for (let i = 0; i < this.n; i++) {
+            const j = this.idx[i] * 3;
+            pos[j] = home[j]; pos[j+1] = home[j+1]; pos[j+2] = home[j+2];
+            col[j] = homeCol[j]; col[j+1] = homeCol[j+1]; col[j+2] = homeCol[j+2];
+        }
+        this.geo.attributes.position.needsUpdate = true;
+        this.geo.attributes.color.needsUpdate = true;
+        if (this.anchor) { this.galaxy.scene.remove(this.anchor); this.anchor = null; }
+        if (this.wordPoints) {
+            this.galaxy.group.remove(this.wordPoints);
+            this.wordMat.dispose(); // 注意：wordGeo 与盘面共享属性，不能 dispose
+            this.wordPoints = null;
+        }
+    }
+
+    update() {
+        if (this.phase === 'done' || !this.geo) return;
+        this.tick++;
+        if (this.flash > 0.01) this.flash *= 0.94; else this.flash = 0;
+
+        let rawT;
+        if (this.phase === 'assembling')   rawT = Math.min(1, this.tick / this.T_ASSEMBLE);
+        else if (this.phase === 'holding') rawT = 1;
+        else                               rawT = Math.min(1, this.tick / this.T_DISPERSE);
+
+        if (this.camera) this.anchor.quaternion.copy(this.camera.quaternion);
+        this.galaxy.scene.updateMatrixWorld();
+        const group = this.galaxy.group;
+        const pos = this.geo.attributes.position.array;
+        const col = this.geo.attributes.color.array;
+        const home = this.galaxy.diskHomePos, homeCol = this.galaxy.diskHomeCol;
+        const WORD_W = Math.min(460, 60 + this.word.length * 36) * this.scaleFactor;
+        const WORD_H = WORD_W * 0.28;
+        const holding = this.phase === 'holding';
+        const v = this._v;
+
+        for (let i = 0; i < this.n; i++) {
+            // 每颗星自己的进度（带随机延迟，借出与归还共用同一延迟曲线）
+            const t = Math.max(0, Math.min(1, (rawT - this.delay[i]) / (1 - this.delay[i])));
+            const e = 1 - Math.pow(1 - t, 3);
+            const k = this.phase === 'dispersing' ? 1 - e : e;
+
+            // 目标点：单位坐标 → 锚点世界坐标 → 盘面本地坐标
+            v.set(this.unit[i*2] * WORD_W, this.unit[i*2+1] * WORD_H, 0);
+            this.anchor.localToWorld(v);
+            group.worldToLocal(v);
+
+            const j = this.idx[i] * 3;
+            const hx = home[j], hy = home[j+1], hz = home[j+2];
+            let x = hx + (v.x - hx) * k;
+            let y = hy + (v.y - hy) * k;
+            let z = hz + (v.z - hz) * k;
+            if (holding) { // 悬停时轻微闪烁
+                const s = 0.8;
+                x += (Math.random()-0.5) * s; y += (Math.random()-0.5) * s; z += (Math.random()-0.5) * s * 0.3;
+            }
+            pos[j] = x; pos[j+1] = y; pos[j+2] = z;
+
+            // 颜色：原色 → 词色（金/青），点亮闪光时额外增亮
+            const boost = 1 + this.flash * k * 1.2;
+            col[j]   = (homeCol[j]   + (this.wordCol[j]   - homeCol[j])   * k) * boost;
+            col[j+1] = (homeCol[j+1] + (this.wordCol[j+1] - homeCol[j+1]) * k) * boost;
+            col[j+2] = (homeCol[j+2] + (this.wordCol[j+2] - homeCol[j+2]) * k) * boost;
+        }
+        this.geo.attributes.position.needsUpdate = true;
+        this.geo.attributes.color.needsUpdate = true;
+
+        if (this.wordMat) {
+            this.wordMat.opacity = this.phase === 'assembling' ? rawT
+                : this.phase === 'dispersing' ? 1 - rawT : 1;
+        }
+
+        if (this.phase === 'assembling' && rawT >= 1) { this.phase = 'holding'; this.tick = 0; }
+        else if (this.phase === 'holding' && this.tick >= this.T_HOLD + (this.holdExtra || 0)) { this.phase = 'dispersing'; this.tick = 0; }
+        else if (this.phase === 'dispersing' && rawT >= 1) { this._restore(); this.phase = 'done'; }
+    }
+
+    isDone() { return this.phase === 'done'; }
+}
+</script>
+<script>
+window.addEventListener('load', () => {
+  const out = [];
+  try {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, 16/9, 1, 5000);
+    camera.position.set(0, 520, 980); camera.lookAt(0, 0, 0);
+    const g = new Galaxy(scene); g.init();
+
+    // 1) sampler band check on the real _sampleLetters
+    const probe = Object.create(WordParticles.prototype);
+    ['Python', 'Cursor', 'Hello World!'].forEach(w => {
+      const px = probe._sampleLetters(w);
+      const band = { top: 0, mid: 0, bot: 0 };
+      px.forEach(p => { if (p.ny > 0.05) band.top++; else if (p.ny < -0.15) band.bot++; else band.mid++; });
+      out.push(`SAMPLE ${w}: total=${px.length} top=${band.top} mid=${band.mid} bottom=${band.bot}`);
+    });
+
+    // 2) full pipeline: form 'Python', step 200 frames (should be holding), verify star positions vs targets
+    const wp2 = new WordParticles('Python', g, camera, 0);
+    for (let f = 0; f < 200; f++) wp2.update();
+    out.push(`PHASE after 200 updates: ${wp2.phase}, n=${wp2.n}`);
+    const pos = g.diskPoints.geometry.attributes.position.array;
+    const v = new THREE.Vector3();
+    scene.updateMatrixWorld();
+    const bands = { top: { ok: 0, bad: 0 }, mid: { ok: 0, bad: 0 }, bot: { ok: 0, bad: 0 } };
+    let worst = [];
+    for (let i = 0; i < wp2.n; i++) {
+      const ux = wp2.unit[i*2], uy = wp2.unit[i*2+1];
+      v.set(ux * 276, uy * (276 * 0.28), 0); // WORD_W for 'Python' = 60+6*36=276
+      wp2.anchor.localToWorld(v); g.group.worldToLocal(v);
+      const j = wp2.idx[i] * 3;
+      const d = Math.hypot(pos[j] - v.x, pos[j+1] - v.y, pos[j+2] - v.z);
+      const b = uy > 0.05 ? 'top' : uy < -0.15 ? 'bot' : 'mid';
+      if (d < 2.5) bands[b].ok++; else { bands[b].bad++; if (worst.length < 6) worst.push(`i=${i} ny=${uy.toFixed(2)} dist=${d.toFixed(1)}`); }
+    }
+    out.push(`AT-TARGET top: ok=${bands.top.ok} bad=${bands.top.bad}`);
+    out.push(`AT-Target mid: ok=${bands.mid.ok} bad=${bands.mid.bad}`);
+    out.push(`AT-TARGET bottom: ok=${bands.bot.ok} bad=${bands.bot.bad}`);
+    out.push(`worst: ${worst.join(' | ')}`);
+  } catch (e) {
+    out.push('ERROR: ' + (e && e.stack || e));
+  }
+  document.getElementById('out').textContent = out.join('\n');
+});
+</script>
+</body></html>
