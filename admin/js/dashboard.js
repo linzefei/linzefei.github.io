@@ -207,16 +207,34 @@ async function deleteWord(id) {
     }
 }
 
+async function insertWord(val) {
+    const qb = await sb.from('visitor_words');
+    await qb.insert({ word: val, approved: true, source: 'admin' });
+}
+
 async function addContentItem() {
     const inp = document.getElementById('newContentItem');
     const val = inp.value.trim();
     if (!val) return;
     try {
-        const qb = await sb.from('visitor_words');
-        await qb.insert({ word: val, approved: true, source: 'admin' });
+        await insertWord(val);
         inp.value = '';
         toast('词已添加', 'ok');
         loadContent();
+    } catch (e) {
+        toast('添加失败: ' + e.message, 'fail');
+    }
+}
+
+async function addQuickWord() {
+    const inp = document.getElementById('quickWord');
+    const val = inp.value.trim();
+    if (!val) return;
+    try {
+        await insertWord(val);
+        inp.value = '';
+        toast('词已添加', 'ok');
+        loadOverview();
     } catch (e) {
         toast('添加失败: ' + e.message, 'fail');
     }

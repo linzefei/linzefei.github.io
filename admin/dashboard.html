@@ -51,6 +51,15 @@
 
       <!-- ── 总览 ──────────────────────────────────────────── -->
       <div class="tab-panel active" id="tab-overview">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <span class="card-title">快速加词</span>
+          </div>
+          <div class="input-row" style="margin-bottom:0">
+            <input type="text" id="quickWord" placeholder="输入一个词（如 Docker）" maxlength="30" onkeydown="if(event.key==='Enter')addQuickWord()">
+            <button class="btn btn-primary btn-sm" style="width:auto" onclick="addQuickWord()">添加</button>
+          </div>
+        </div>
         <div class="grid-4">
           <div class="card">
             <div class="card-title">总访问量</div>
@@ -138,7 +147,7 @@
           <div id="approvedWordList"><div class="empty-state">加载中…</div></div>
           <hr class="divider">
           <div class="input-row">
-            <input type="text" id="newContentItem" placeholder="直接添加词（如 Docker）" maxlength="30">
+            <input type="text" id="newContentItem" placeholder="直接添加词（如 Docker）" maxlength="30" onkeydown="if(event.key==='Enter')addContentItem()">
             <button class="btn btn-primary btn-sm" onclick="addContentItem()">添加</button>
           </div>
         </div>
