@@ -223,18 +223,24 @@ async function deleteWord(id) {
     }
 }
 
-async function insertWord(val) {
-    // 防重复：不分大小写先查一遍（数据库另有 lower(word) 唯一索引兜底）
-    // 返回值：成功添加返回 null；重复时返回原词的添加日期（ISO 字符串）
-    const qb = await sb.from('visitor_words');
-    const rows = await qb.select('word,created_at').get();
-    if (Array.isArray(rows)) {
-        const hit = rows.find(r => (r.word || '').trim().toLowerCase() === val.toLowerCase());
-        if (hit) return hit.created_at || '';
+async function insertWord(val, force = false) {
+    // 防重复分三档：
+    // - 完全相同（大小写也一样）→ 拒绝，返回 { type:'exact', created_at }
+    // - 只有大小写不同 → 返回 { type:'case', matches }，由调用方弹窗问用户
+    // - 无冲突（或 force=true）→ 直接添加，返回 { type:'added' }
+    if (!force) {
+        const qb = await sb.from('visitor_words');
+        const rows = await qb.select('word,created_at').get();
+        if (Array.isArray(rows)) {
+            const exact = rows.find(r => (r.word || '').trim() === val);
+            if (exact) return { type: 'exact', created_at: exact.created_at || '' };
+            const ci = rows.filter(r => (r.word || '').trim().toLowerCase() === val.toLowerCase());
+            if (ci.length) return { type: 'case', matches: ci };
+        }
     }
     const qb2 = await sb.from('visitor_words');
     await qb2.insert({ word: val, approved: true, source: 'admin' });
-    return null;
+    return { type: 'added' };
 }
 
 function dupToast(createdAt) {
@@ -243,13 +249,29 @@ function dupToast(createdAt) {
     toast(`这个词已经有了（${d} 添加）`, 'fail');
 }
 
+// 加词总入口：处理三档结果，返回 true 表示已添加
+async function tryAddWord(val) {
+    const res = await insertWord(val);
+    if (res.type === 'added') return true;
+    if (res.type === 'exact') { dupToast(res.created_at); return false; }
+    // 只有大小写不同：大小写可能改变词义，列出已有词让用户决定
+    const list = res.matches.map(m => `「${m.word}」`).join('、');
+    const first = res.matches[0];
+    const d = first.created_at
+        ? new Date(first.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '';
+    const ok = confirm(`已有 ${list}${d ? `（${d} 添加）` : ''}，你输入的是「${val}」，只是大小写不同。\n大小写不同意思可能不同，仍要作为新词添加吗？`);
+    if (!ok) return false;
+    await insertWord(val, true);
+    return true;
+}
+
 async function addContentItem() {
     const inp = document.getElementById('newContentItem');
     const val = inp.value.trim();
     if (!val) return;
     try {
-        const dupDate = await insertWord(val);
-        if (dupDate !== null) { dupToast(dupDate); return; }
+        if (!await tryAddWord(val)) return;
         inp.value = '';
         toast('词已添加', 'ok');
         loadContent();
@@ -263,8 +285,7 @@ async function addQuickWord() {
     const val = inp.value.trim();
     if (!val) return;
     try {
-        const dupDate = await insertWord(val);
-        if (dupDate !== null) { dupToast(dupDate); return; }
+        if (!await tryAddWord(val)) return;
         inp.value = '';
         toast('词已添加', 'ok');
         loadOverview();
