@@ -74,11 +74,51 @@ class SupabaseClient {
         this._saveSession(null);
     }
 
+    /* 用 refresh_token 换新 access_token（Supabase 的 access_token 只有 1 小时，
+       原实现从不续期，登录满 1 小时后所有接口都报 JWT expired） */
+    async _refreshSession() {
+        if (!this._session?.refresh_token) return false;
+        if (this._refreshing) return this._refreshing;
+        this._refreshing = (async () => {
+            try {
+                const res = await fetch(`${this.url}/auth/v1/token?grant_type=refresh_token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'apikey': this.key },
+                    body: JSON.stringify({ refresh_token: this._session.refresh_token })
+                });
+                if (!res.ok) return false;
+                const data = await res.json();
+                this._saveSession({
+                    access_token:  data.access_token,
+                    refresh_token: data.refresh_token,
+                    expires_at:    Math.floor(Date.now() / 1000) + (data.expires_in || 3600)
+                });
+                return true;
+            } catch { return false; }
+            finally { this._refreshing = null; }
+        })();
+        return this._refreshing;
+    }
+
+    /* 令牌快过期（60 秒内）或已过期时先续期 */
+    async _ensureFresh() {
+        if (!this._session?.access_token || !this._session?.expires_at) return;
+        if (this._session.expires_at - Math.floor(Date.now() / 1000) < 60) {
+            await this._refreshSession();
+        }
+    }
+
     async getUser() {
         if (!this._session?.access_token) return null;
-        const res = await fetch(`${this.url}/auth/v1/user`, {
+        await this._ensureFresh();
+        let res = await fetch(`${this.url}/auth/v1/user`, {
             headers: this._headers()
         });
+        if (!res.ok && await this._refreshSession()) {
+            res = await fetch(`${this.url}/auth/v1/user`, {
+                headers: this._headers()
+            });
+        }
         if (!res.ok) { this._saveSession(null); return null; }
         return res.json();
     }
@@ -90,12 +130,23 @@ class SupabaseClient {
         return new QueryBuilder(this, table);
     }
 
-    async _req(method, path, body, extra = {}) {
+    async _req(method, path, body, extra = {}, _retried = false) {
+        await this._ensureFresh();
         const res = await fetch(`${this.url}/rest/v1/${path}`, {
             method,
             headers: this._headers({ 'Prefer': 'return=representation', ...extra }),
             body: body ? JSON.stringify(body) : undefined
         });
+        if (res.status === 401 && !_retried && this._session?.refresh_token) {
+            if (await this._refreshSession()) {
+                return this._req(method, path, body, extra, true);
+            }
+            this._saveSession(null);
+            if (!location.pathname.endsWith('/admin/index.html')) {
+                location.href = '/admin/index.html';
+            }
+            throw new Error('登录已过期，请重新登录');
+        }
         const text = await res.text();
         let data;
         try { data = JSON.parse(text); } catch { data = text; }
