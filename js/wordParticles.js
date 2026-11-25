@@ -130,7 +130,7 @@ class WordParticles {
         const now = performance.now();
         let dt = this._lastNow == null ? 0 : (now - this._lastNow) / 1000;
         this._lastNow = now;
-        if (dt > 0.5) dt = 0.5; // 切后台回来时单帧步长封顶，避免词瞬间跳完；0.5s 足以覆盖低帧率设备的正常帧间隔
+        if (dt > 1.0) dt = 1.0; // 切后台回来时单帧步长封顶，避免词瞬间跳完；封顶 1s 兼顾极低帧率设备（0.5s 会让它们全程慢动作）
         this.tPhase += dt;
         if (this.flash > 0.01) this.flash *= Math.pow(0.94, dt * 60); else this.flash = 0;
 

@@ -127,7 +127,7 @@
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.9.2';
+    const SITE_VERSION = 'v0.9.3';
     const _verEl = document.getElementById('site-version');
     if (_verEl) _verEl.textContent = SITE_VERSION;
 
@@ -294,8 +294,8 @@
         const entry = wordQueue[queueIndex];
         if (entry) {
             activeEntry = entry;
-            // 主词只借盘面前 5400 颗星，后半盘面留给背景沉浮的词，两边不抢星
-            activeWord = new WordParticles(entry.word, galaxy, wordCamera, igniteTier(entry.ignite_count), 5400);
+            // 主词只借盘面前 4200 颗星，其余盘面留给背景沉浮的词，两边不抢星
+            activeWord = new WordParticles(entry.word, galaxy, wordCamera, igniteTier(entry.ignite_count), 4200);
             if (ambient) ambient.setMainWord(entry.word);
             updateIgniteBadge();
         }
