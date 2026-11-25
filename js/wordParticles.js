@@ -6,9 +6,10 @@
  * 归位时恢复原色。点亮档位决定词的整体大小（被点亮越多，词越大）。
  */
 class WordParticles {
-    constructor(word, galaxy, camera, tier) {
+    constructor(word, galaxy, camera, tier, borrowLimit) {
         this.word = word; this.galaxy = galaxy; this.camera = camera;
         this.tier = tier || 0;
+        this.borrowLimit = borrowLimit || 0; // >0 时只在前 borrowLimit 颗盘面星里借
         this.scaleFactor = [1, 1.15, 1.3, 1.45][this.tier] || 1;
         this.phase = 'assembling';
         // 计时改用真实秒数（原为帧数：120/300/110 帧 @60fps），
@@ -48,7 +49,8 @@ class WordParticles {
 
         // 借连续一段盘面星星（盘面生成顺序本身是随机的，连续段在空间上也是散布的；
         // 连续段同时让高亮层可以用 drawRange 只重绘这批星）
-        const total = this.galaxy.diskHomePos.length / 3;
+        const totalAll = this.galaxy.diskHomePos.length / 3;
+        const total = this.borrowLimit ? Math.min(this.borrowLimit, totalAll) : totalAll;
         this.idx = new Uint32Array(this.n);
         this.startIdx = Math.floor(Math.random() * Math.max(1, total - this.n));
         for (let i = 0; i < this.n; i++) this.idx[i] = this.startIdx + i;
