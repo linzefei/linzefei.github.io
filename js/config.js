@@ -4,7 +4,9 @@ const GALAXY_CONFIG = {
         disk:       12000,   // 大幅削减
         core:       3000,    
         halo:       1000,    
-        background: 2000,    
+        background: 2000,
+        sky:        4500,    // 满天星空：小星星
+        skyBright:  1200,    // 满天星空：亮星星
         nebula:     600,     
     },
     size: {

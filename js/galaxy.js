@@ -48,6 +48,37 @@ class Galaxy {
         this.scene.add(this._makePoints(pos, col, tex, 1.2, 0.8));
     }
 
+    // 满天星空：旧的 background 层在 2500–5000 外（已到远裁剪面边缘），
+    // 又小又暗，边缘看起来还是黑的。这一层放在 1500–3000 的球壳上——
+    // 比盘面（半径 500）远、比远裁剪面（5000）近得多，大小和亮度都够
+    // 在画面边缘看清；分两档：大量小星 + 少量亮星，逐颗闪烁。
+    // 加到 scene（不跟盘面一起转），是远处的“天”，背景词浮在它前面才合理。
+    _createSky(tex) {
+        this.skyLayers = [];
+        const layers = [
+            { n: GALAXY_CONFIG.particles.sky,       size: 1.5, bright: [0.30, 0.70], speed: 0.9 },
+            { n: GALAXY_CONFIG.particles.skyBright, size: 2.6, bright: [0.60, 1.00], speed: 0.6 },
+        ];
+        for (const L of layers) {
+            const pos = new Float32Array(L.n * 3), col = new Float32Array(L.n * 3);
+            const phase = new Float32Array(L.n);
+            for (let i = 0; i < L.n; i++) {
+                const r = 1500 + Math.random() * 1500, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+                pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+                pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
+                pos[i * 3 + 2] = r * Math.cos(ph);
+                const b = L.bright[0] + Math.random() * (L.bright[1] - L.bright[0]);
+                if (Math.random() < 0.15) { col[i * 3] = b; col[i * 3 + 1] = b * 0.85; col[i * 3 + 2] = b * 0.6; } // 少量暖色星
+                else { col[i * 3] = b; col[i * 3 + 1] = b; col[i * 3 + 2] = b * 1.15; } // 偏冷白
+                phase[i] = Math.random() * Math.PI * 2;
+            }
+            const points = this._makePoints(pos, col, tex, L.size, 0.9);
+            points.frustumCulled = false; // 球壳横跨整个视野，别被裁掉
+            this.scene.add(points);
+            this.skyLayers.push({ points, base: col.slice(), phase, speed: L.speed, n: L.n });
+        }
+    }
+
     _createDisk(tex) {
         const n=GALAXY_CONFIG.particles.disk, cfg=GALAXY_CONFIG; const pos=new Float32Array(n*3), col=new Float32Array(n*3);
         for(let i=0; i<n; i++){
@@ -104,7 +135,7 @@ class Galaxy {
     init() {
         const sTex=this._createStarTexture(), nTex=this._createNebulaTexture();
         this.starTexture = sTex; // 供 WordParticles 的高亮层复用
-        this._createBackground(sTex); this._createDisk(sTex); this._createNebula(nTex); this._createCore(sTex); this._createCentralGlow();
+        this._createBackground(sTex); this._createSky(sTex); this._createDisk(sTex); this._createNebula(nTex); this._createCore(sTex); this._createCentralGlow();
         this.group.rotation.x = -0.22;
     }
 
@@ -134,6 +165,20 @@ class Galaxy {
     update() {
         this.time += 0.016;
         this.group.rotation.y += GALAXY_CONFIG.rotation.disk;
+
+        // 星空逐颗闪烁：每颗星按自己的相位明暗变化（0.62–1.0 倍亮度）
+        if (this.skyLayers) {
+            for (const L of this.skyLayers) {
+                const col = L.points.geometry.attributes.color.array;
+                for (let i = 0; i < L.n; i++) {
+                    const tw = 0.62 + 0.38 * Math.sin(this.time * L.speed + L.phase[i]);
+                    col[i * 3] = L.base[i * 3] * tw;
+                    col[i * 3 + 1] = L.base[i * 3 + 1] * tw;
+                    col[i * 3 + 2] = L.base[i * 3 + 2] * tw;
+                }
+                L.points.geometry.attributes.color.needsUpdate = true;
+            }
+        }
 
         // 核心脉冲
         if(this.coreSprite) this.coreSprite.scale.set(160*(1+Math.sin(this.time*1.4)*0.06), 160*(1+Math.sin(this.time*1.4)*0.06), 1);
