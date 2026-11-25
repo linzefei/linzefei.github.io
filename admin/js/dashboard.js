@@ -208,8 +208,23 @@ async function deleteWord(id) {
 }
 
 async function insertWord(val) {
+    // 防重复：不分大小写先查一遍（数据库另有 lower(word) 唯一索引兜底）
+    // 返回值：成功添加返回 null；重复时返回原词的添加日期（ISO 字符串）
     const qb = await sb.from('visitor_words');
-    await qb.insert({ word: val, approved: true, source: 'admin' });
+    const rows = await qb.select('word,created_at').get();
+    if (Array.isArray(rows)) {
+        const hit = rows.find(r => (r.word || '').trim().toLowerCase() === val.toLowerCase());
+        if (hit) return hit.created_at || '';
+    }
+    const qb2 = await sb.from('visitor_words');
+    await qb2.insert({ word: val, approved: true, source: 'admin' });
+    return null;
+}
+
+function dupToast(createdAt) {
+    if (!createdAt) { toast('这个词已经有了', 'fail'); return; }
+    const d = new Date(createdAt).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    toast(`这个词已经有了（${d} 添加）`, 'fail');
 }
 
 async function addContentItem() {
@@ -217,7 +232,8 @@ async function addContentItem() {
     const val = inp.value.trim();
     if (!val) return;
     try {
-        await insertWord(val);
+        const dupDate = await insertWord(val);
+        if (dupDate !== null) { dupToast(dupDate); return; }
         inp.value = '';
         toast('词已添加', 'ok');
         loadContent();
@@ -231,7 +247,8 @@ async function addQuickWord() {
     const val = inp.value.trim();
     if (!val) return;
     try {
-        await insertWord(val);
+        const dupDate = await insertWord(val);
+        if (dupDate !== null) { dupToast(dupDate); return; }
         inp.value = '';
         toast('词已添加', 'ok');
         loadOverview();
