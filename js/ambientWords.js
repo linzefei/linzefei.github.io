@@ -2,7 +2,7 @@
  * AmbientWords – 漫天星河：背景里此起彼伏的词
  *
  * 主词之外，再让一批词同时在星河背景里沉浮：每个词借一小片盘面星星，
- * 慢慢涨起（成字）、悬浮起伏、再落潮散回原位，轮流展露词库里的词。
+ * 慢慢涨起（成字）、静静停留、再落潮散回原位，轮流展露词库里的词。
  * 主词始终在中央唱主角，背景词更小、更暗，只作氛围，不抢戏、不可点亮。
  *
  * 此起彼伏：每个槽位有自己的固定节奏系数（tempo），且每轮的
@@ -53,7 +53,6 @@ class AmbientWords {
         this._fwd = new THREE.Vector3();
         this._view = { halfW: 0, halfH: 0, dist: 0 };
         this._lastNow = null;
-        this.time = 0;
         window._ambient = this; // 调试/验证用
     }
 
@@ -82,9 +81,7 @@ class AmbientWords {
                 t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
                 word: null, n: 0, unit: null, wordCol: null, delay: null,
                 width: 0, spot: s, // 位置是槽位固定的（建槽时按网格分好，互不重叠）
-                durIn: 4, durHold: 8, durOut: 4,
-                bobPhase: Math.random() * Math.PI * 2,
-                bobSpeed: 0.35 + Math.random() * 0.4
+                durIn: 4, durHold: 8, durOut: 4
             });
         }
     }
@@ -201,7 +198,7 @@ class AmbientWords {
             else { slot.wordCol[i * 3] = 0.10; slot.wordCol[i * 3 + 1] = 1.05; slot.wordCol[i * 3 + 2] = 0.95; } // Neon Cyan
         });
         slot.delay = new Float32Array(slot.n);
-        for (let i = 0; i < slot.n; i++) slot.delay[i] = Math.random() * 0.45;
+        for (let i = 0; i < slot.n; i++) slot.delay[i] = Math.random() * 0.15;
         // 词宽随屏幕走：最宽不超过可视宽度的约 1/3，且不超过本槽位网格单元
         // （窄屏位置向中心收拢，单元宽也要按同比例收窄，否则相邻词会叠在一起）
         const view = this._computeView();
@@ -212,7 +209,7 @@ class AmbientWords {
         // 时长：大范围随机 ÷ 本槽位节奏 → 每轮周期都不同，槽位之间更不同步
         // 停留占大头、过渡和间隔压短，保证成形词的在场率
         slot.durIn   = (2.5 + Math.random() * 2) / slot.tempo;
-        slot.durHold = (7 + Math.random() * 7) / slot.tempo;
+        slot.durHold = (10 + Math.random() * 8) / slot.tempo;
         slot.durOut  = (2.5 + Math.random() * 2) / slot.tempo;
         slot.state = 'in'; slot.t = 0;
         return true;
@@ -238,11 +235,9 @@ class AmbientWords {
         // 窄屏向中心收拢（手机上边角看不清），宽屏铺开
         const concX = this.camera.aspect < 1 ? 0.62 : 0.85;
         const concY = this.camera.aspect < 1 ? 0.68 : 0.85;
-        // 沉浮：归一化空间里的小幅正弦漂移
-        const bobX = Math.cos(this.time * slot.bobSpeed * 0.7 + slot.bobPhase) * 0.02;
-        const bobY = Math.sin(this.time * slot.bobSpeed + slot.bobPhase) * 0.035;
-        const nx = spot.nx * concX + bobX;
-        const ny = spot.ny * concY + bobY;
+        // 停留时位置固定不动（v0.9.6：去掉正弦漂移，字不再来回晃）
+        const nx = spot.nx * concX;
+        const ny = spot.ny * concY;
         const p = slot.anchor.position;
         p.copy(this._origin)
             .addScaledVector(this._right, nx * view.halfW)
@@ -258,7 +253,6 @@ class AmbientWords {
         this._lastNow = now;
         if (dt > 1.0) dt = 1.0; // 封顶 1s：防切后台回来跳变，又不让低帧率设备全程慢动作
         if (dt <= 0) return;
-        this.time += dt;
 
         const pos = this.geo.attributes.position.array;
         const col = this.geo.attributes.color.array;

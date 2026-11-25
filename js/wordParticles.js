@@ -15,7 +15,7 @@ class WordParticles {
         // 计时改用真实秒数（原为帧数：120/300/110 帧 @60fps），
         // 低帧率设备上词的成字/停留/散场节奏与高帧率一致，不再拖慢
         this.tPhase = 0; this._lastNow = null;
-        this.T_ASSEMBLE = 2.0; this.T_HOLD = 5.0; this.T_DISPERSE = 110 / 60;
+        this.T_ASSEMBLE = 2.0; this.T_HOLD = 8.0; this.T_DISPERSE = 110 / 60;
         this.flash = 0;
         this._v = new THREE.Vector3();
         this._init();
@@ -147,7 +147,6 @@ class WordParticles {
         const home = this.galaxy.diskHomePos, homeCol = this.galaxy.diskHomeCol;
         const WORD_W = Math.min(460, 60 + this.word.length * 36) * this.scaleFactor;
         const WORD_H = WORD_W * 0.28;
-        const holding = this.phase === 'holding';
         const v = this._v;
 
         for (let i = 0; i < this.n; i++) {
@@ -166,10 +165,6 @@ class WordParticles {
             let x = hx + (v.x - hx) * k;
             let y = hy + (v.y - hy) * k;
             let z = hz + (v.z - hz) * k;
-            if (holding) { // 悬停时轻微闪烁
-                const s = 0.8;
-                x += (Math.random()-0.5) * s; y += (Math.random()-0.5) * s; z += (Math.random()-0.5) * s * 0.3;
-            }
             pos[j] = x; pos[j+1] = y; pos[j+2] = z;
 
             // 颜色：原色 → 词色（金/青），点亮闪光时额外增亮
