@@ -34,25 +34,28 @@ function switchTab(name) {
 /* ─── Overview ─────────────────────────────────────────────── */
 async function loadOverview() {
     try {
+        // 5 路查询互不依赖，并行发只花一个往返（原来串行要 5 个）
+        const today = new Date().toISOString().slice(0, 10);
+        const [visits, todayVisits, tags, words, recent] = await Promise.all([
+            (await sb.from('page_visits')).select('id').get(),
+            (await sb.from('page_visits')).select('id').eq('date', today).get(),
+            (await sb.from('site_tags')).select('id').get(),
+            (await sb.from('visitor_words')).select('id').get(),
+            (await sb.from('visitor_words')).select('word,created_at').eq('approved', true).order('created_at', { ascending: false }).limit(3).get()
+        ]);
         // Total visits
-        const visits = await (await sb.from('page_visits')).select('id').get();
         document.getElementById('totalVisits').textContent = Array.isArray(visits) ? visits.length : '–';
 
         // Today
-        const today = new Date().toISOString().slice(0, 10);
-        const todayVisits = await (await sb.from('page_visits')).select('id').eq('date', today).get();
         document.getElementById('todayVisits').textContent = Array.isArray(todayVisits) ? todayVisits.length : '–';
 
         // Tags count
-        const tags = await (await sb.from('site_tags')).select('id').get();
         document.getElementById('tagsCount').textContent = Array.isArray(tags) ? tags.length : '–';
 
         // Word count
-        const words = await (await sb.from('visitor_words')).select('id').get();
         document.getElementById('contentCount').textContent = Array.isArray(words) ? words.length : '–';
 
         // 最近添加的 3 个词（已通过，按添加时间倒序）
-        const recent = await (await sb.from('visitor_words')).select('word,created_at').eq('approved', true).order('created_at', { ascending: false }).limit(3).get();
         const rw = document.getElementById('recentWords');
         if (rw) {
             rw.innerHTML = (Array.isArray(recent) && recent.length) ? recent.map(w => `
@@ -224,14 +227,16 @@ async function insertWord(val, force = false) {
     // - 只有大小写不同 → 返回 { type:'case', matches }，由调用方弹窗问用户
     // - 无冲突（或 force=true）→ 直接添加，返回 { type:'added' }
     if (!force) {
-        const qb = await sb.from('visitor_words');
-        const rows = await qb.select('word,created_at').get();
-        if (Array.isArray(rows)) {
-            const exact = rows.find(r => (r.word || '').trim() === val);
-            if (exact) return { type: 'exact', created_at: exact.created_at || '' };
-            const ci = rows.filter(r => (r.word || '').trim().toLowerCase() === val.toLowerCase());
-            if (ci.length) return { type: 'case', matches: ci };
+        // 查重不再全表拉取：精确匹配走 word 唯一索引，大小写变体走 ilike，两路并行只花一个往返
+        const [exactRows, ciRows] = await Promise.all([
+            (await sb.from('visitor_words')).select('word,created_at').eq('word', val).limit(1).get(),
+            (await sb.from('visitor_words')).select('word,created_at').ilike('word', val).limit(5).get()
+        ]);
+        if (Array.isArray(exactRows) && exactRows.length) {
+            return { type: 'exact', created_at: exactRows[0].created_at || '' };
         }
+        const ci = (Array.isArray(ciRows) ? ciRows : []).filter(r => (r.word || '').trim().toLowerCase() === val.toLowerCase());
+        if (ci.length) return { type: 'case', matches: ci };
     }
     const qb2 = await sb.from('visitor_words');
     await qb2.insert({ word: val, approved: true, source: 'admin' });
@@ -261,10 +266,19 @@ async function tryAddWord(val) {
     return true;
 }
 
+// 加词进行时：按钮立刻变“添加中…”并禁用，输入框也锁住，避免用户对着没反应的界面干等
+function setAddBusy(inp, busy) {
+    const row = inp.closest('.input-row');
+    const btn = row ? row.querySelector('button') : null;
+    if (btn) { btn.disabled = busy; btn.textContent = busy ? '添加中…' : '添加'; }
+    inp.disabled = busy;
+}
+
 async function addContentItem() {
     const inp = document.getElementById('newContentItem');
     const val = inp.value.trim();
     if (!val) return;
+    setAddBusy(inp, true);
     try {
         if (!await tryAddWord(val)) return;
         inp.value = '';
@@ -272,6 +286,8 @@ async function addContentItem() {
         loadContent();
     } catch (e) {
         toast('添加失败: ' + e.message, 'fail');
+    } finally {
+        setAddBusy(inp, false);
     }
 }
 
@@ -279,6 +295,7 @@ async function addQuickWord() {
     const inp = document.getElementById('quickWord');
     const val = inp.value.trim();
     if (!val) return;
+    setAddBusy(inp, true);
     try {
         if (!await tryAddWord(val)) return;
         inp.value = '';
@@ -286,6 +303,8 @@ async function addQuickWord() {
         loadOverview();
     } catch (e) {
         toast('添加失败: ' + e.message, 'fail');
+    } finally {
+        setAddBusy(inp, false);
     }
 }
 
