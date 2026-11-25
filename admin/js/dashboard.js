@@ -94,16 +94,16 @@ async function loadRecentVisits() {
 /* ─── Stats tab ────────────────────────────────────────────── */
 async function loadStats() {
     try {
-        // Fetch all visits grouped by date
+        // 一次取回所需的三列。旧代码查了不存在的 count 列，接口直接报错，
+        // 整个统计页因此一片空白；来源统计还漏查了 referrer 列（全显示直接访问）
         const qb = await sb.from('page_visits');
-        const data = await qb.select('date,count').get();
+        const data = await qb.select('date,visitor_id,referrer').get();
+        const rows = Array.isArray(data) ? data : [];
 
         // Build chart data for last 14 days
         const days = 14;
         const map = {};
-        if (Array.isArray(data)) {
-            data.forEach(r => { map[r.date] = (map[r.date] || 0) + 1; });
-        }
+        rows.forEach(r => { map[r.date] = (map[r.date] || 0) + 1; });
         const labels = [], counts = [];
         for (let i = days - 1; i >= 0; i--) {
             const d = new Date();
@@ -115,28 +115,23 @@ async function loadStats() {
 
         renderChart('chartBars', 'chartLabels', labels, counts);
 
-        // Total unique visitors (by visitor_id)
-        const uvQb = await sb.from('page_visits');
-        const allVisits = await uvQb.select('visitor_id,date').get();
-        if (Array.isArray(allVisits)) {
-            const uvSet = new Set(allVisits.map(r => r.visitor_id).filter(Boolean));
-            document.getElementById('totalUV').textContent = uvSet.size;
-            document.getElementById('totalPV').textContent = allVisits.length;
-            // Top referrers
-            const refMap = {};
-            allVisits.forEach(r => {
-                const ref = r.referrer || '直接访问';
-                refMap[ref] = (refMap[ref] || 0) + 1;
-            });
-            const sorted = Object.entries(refMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
-            document.getElementById('refTbody').innerHTML = sorted.map(([ref, cnt]) => `
-                <tr>
-                    <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ref}</td>
-                    <td>${cnt}</td>
-                    <td>${Math.round(cnt / allVisits.length * 100)}%</td>
-                </tr>
-            `).join('') || '<tr><td colspan="3" class="empty-state">暂无数据</td></tr>';
-        }
+        // Totals + Top referrers
+        const uvSet = new Set(rows.map(r => r.visitor_id).filter(Boolean));
+        document.getElementById('totalUV').textContent = uvSet.size;
+        document.getElementById('totalPV').textContent = rows.length;
+        const refMap = {};
+        rows.forEach(r => {
+            const ref = r.referrer || '直接访问';
+            refMap[ref] = (refMap[ref] || 0) + 1;
+        });
+        const sorted = Object.entries(refMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        document.getElementById('refTbody').innerHTML = sorted.map(([ref, cnt]) => `
+            <tr>
+                <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(ref)}</td>
+                <td>${cnt}</td>
+                <td>${rows.length ? Math.round(cnt / rows.length * 100) : 0}%</td>
+            </tr>
+        `).join('') || '<tr><td colspan="3" class="empty-state">暂无数据</td></tr>';
     } catch (e) {
         console.warn('Stats load error:', e);
     }
