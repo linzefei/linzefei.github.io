@@ -16,12 +16,13 @@
  * 这样任何屏幕、任何缩放下词都保证在可见范围内：窄屏（手机）
  * 自动向中心收拢，宽屏（PC）可以铺得更开。
  *
- * 成长感：同时在场的背景词数量随词库长大而变多——桌面 词数/6+2
- * （4–9 个封顶）、手机 词数/8+2（3–5 个封顶）。词越多星河越热闹，
- * 但到顶就不再加，避免画面太花。
+ * 成长感：同时在场的背景词数量随词库长大而变多——桌面 词数/3+5
+ * （封顶 50 个）、手机 词数/5+3（封顶 12 个）。词越多星河越热闹，
+ * 但到顶就不再加，避免画面太花。槽位多时背景词采样变稀（每词
+ * 620→300→170 颗星），槽位按网格生成、每槽固定一个位置不重叠。
  *
- * 借星分区（盘面共 12000 颗）：主词只在 [0, 4200) 里借（见 index.html
- * 给 WordParticles 传的 borrowLimit），背景词用 [4200, 12000)，
+ * 借星分区（盘面共 12000 颗）：主词只在 [0, 3000) 里借（见 index.html
+ * 给 WordParticles 传的 borrowLimit），背景词用 [3000, 12000)，
  * 按槽位数均分，两边永不抢同一颗星。
  */
 class AmbientWords {
@@ -32,21 +33,17 @@ class AmbientWords {
         this.pool = [];
         this.mainWord = null;
         this.deck = [];
-        this.ZONE_START = 4200;
-        this.MAX_STARS = 620;
+        this.ZONE_START = 3000;
+        this.MAX_STARS = 620; // 槽位少时每词最多 620 颗星；槽位多时在 _buildSlots 里调稀
+        this.sampleStep = 2; // 字母采样步长（像素）：2 满密度，3/4 稀疏
         this.slotSize = 0;
         this.minFormed = 3; // 保底在场数，随槽位数缩放（见 _buildSlots）
         // 槽位位置：归一化屏幕坐标（nx, ny ∈ [-1, 1]，相对可视半宽/半高），
         // depth 为沿视线方向的深度偏移（占到中心距离的比例，负 = 更远更小）。
-        // 刻意避开正中央（|nx|<0.34 且 |ny|<0.30 是主词的地盘）。
-        this.spots = [
-            { nx: -0.78, ny:  0.62, depth: -0.08 }, { nx: -0.38, ny:  0.78, depth: -0.12 },
-            { nx:  0.05, ny:  0.84, depth: -0.14 }, { nx:  0.48, ny:  0.74, depth: -0.10 },
-            { nx:  0.80, ny:  0.55, depth: -0.06 }, { nx: -0.85, ny:  0.08, depth: -0.05 },
-            { nx:  0.86, ny:  0.02, depth: -0.05 }, { nx: -0.72, ny: -0.55, depth: -0.03 },
-            { nx:  0.74, ny: -0.60, depth: -0.03 }, { nx: -0.30, ny: -0.78, depth: -0.06 },
-            { nx:  0.32, ny: -0.80, depth: -0.06 }
-        ];
+        // 位置在 _buildSlots 里按网格生成（见 _genSpots），刻意避开正中央
+        // （|nx|<0.36 且 |ny|<0.32 是主词的地盘）。
+        this.spots = [];
+        this.cols = 1; // 网格列数（决定词宽上限，见 _startWord）
         this.slots = []; // 槽位在 setPool 拿到词库规模后按成长规则生成
         this._m = new THREE.Matrix4();
         this._inv = new THREE.Matrix4();
@@ -60,14 +57,20 @@ class AmbientWords {
         window._ambient = this; // 调试/验证用
     }
 
-    // 同时在场的词数随词库成长：桌面 词数/6+2（4–9），手机 词数/8+2（3–5）
+    // 同时在场的词数随词库成长：桌面 词数/3+5（封顶 50），手机 词数/5+3（封顶 12）
+    // 星星是硬约束：背景区 9000 颗星，每词至少 170 颗才成字；槽位越多，
+    // 每词分到的星越少，所以采样随槽位数变稀（620→300→170）
     _buildSlots(wordCount) {
         const mobile = window.innerWidth < 700;
         const n = mobile
-            ? Math.min(5, Math.max(3, Math.floor(wordCount / 8) + 2))
-            : Math.min(9, Math.max(4, Math.floor(wordCount / 6) + 2));
+            ? Math.min(12, Math.max(3, Math.floor(wordCount / 5) + 3))
+            : Math.min(50, Math.max(4, Math.floor(wordCount / 3) + 5));
         this.slotSize = Math.floor((12000 - this.ZONE_START) / n);
+        if (n <= 12) { this.sampleStep = 2; this.MAX_STARS = 620; }
+        else if (n <= 27) { this.sampleStep = 3; this.MAX_STARS = 300; }
+        else { this.sampleStep = 4; this.MAX_STARS = 170; }
         this.minFormed = Math.max(3, Math.round(n / 2));
+        this.spots = this._genSpots(n);
         for (let s = 0; s < n; s++) {
             const anchor = new THREE.Object3D();
             this.galaxy.scene.add(anchor);
@@ -78,12 +81,39 @@ class AmbientWords {
                 state: 'idle',
                 t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
                 word: null, n: 0, unit: null, wordCol: null, delay: null,
-                width: 0, spot: null, lastSpot: -1,
+                width: 0, spot: s, // 位置是槽位固定的（建槽时按网格分好，互不重叠）
                 durIn: 4, durHold: 8, durOut: 4,
                 bobPhase: Math.random() * Math.PI * 2,
                 bobSpeed: 0.35 + Math.random() * 0.4
             });
         }
+    }
+
+    // 槽位按网格生成：数量够多时也不重叠。中央矩形是主词的地盘，留空。
+    _genSpots(n) {
+        const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+        const cols = Math.max(2, Math.ceil(Math.sqrt(n * aspect)));
+        const rows = Math.ceil(n / cols);
+        this.cols = cols;
+        const spots = [];
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (spots.length >= n) break;
+                const nx = -0.92 + (c + 0.5) / cols * 1.84 + (Math.random() - 0.5) * 0.06;
+                const ny = -0.88 + (r + 0.5) / rows * 1.76 + (Math.random() - 0.5) * 0.06;
+                if (Math.abs(nx) < 0.36 && Math.abs(ny) < 0.32) continue; // 中央留给主词
+                spots.push({ nx, ny, depth: -0.05 - (spots.length % 5) * 0.02 });
+            }
+        }
+        // 中央留空导致格子不够时，用随机点补齐（仍避开中央）
+        let guard = 0;
+        while (spots.length < n && guard++ < 200) {
+            const nx = (Math.random() * 2 - 1) * 0.92;
+            const ny = (Math.random() * 2 - 1) * 0.88;
+            if (Math.abs(nx) < 0.36 && Math.abs(ny) < 0.32) continue;
+            spots.push({ nx, ny, depth: -0.05 - (spots.length % 5) * 0.02 });
+        }
+        return spots;
     }
 
     setPool(entries, mainWord) {
@@ -123,7 +153,7 @@ class AmbientWords {
         return null;
     }
 
-    _sampleLetters(word) {
+    _sampleLetters(word, step = 2) {
         const FONT_SIZE = 96; const PAD = 20;
         const tmp = document.createElement('canvas'); const tc = tmp.getContext('2d');
         tc.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
@@ -134,7 +164,7 @@ class AmbientWords {
         ctx.font = `bold ${FONT_SIZE}px Arial, sans-serif`;
         ctx.fillText(word, PAD, FONT_SIZE + PAD * 0.4);
         const data = ctx.getImageData(0, 0, W, H).data, pixels = [];
-        for (let y = 0; y < H; y += 2) { for (let x = 0; x < W; x += 2) { if (data[(y * W + x) * 4 + 3] > 100) pixels.push({ nx: x / W - 0.5, ny: -(y / H - 0.5) }); } }
+        for (let y = 0; y < H; y += step) { for (let x = 0; x < W; x += step) { if (data[(y * W + x) * 4 + 3] > 100) pixels.push({ nx: x / W - 0.5, ny: -(y / H - 0.5) }); } }
         return pixels;
     }
 
@@ -153,7 +183,7 @@ class AmbientWords {
     }
 
     _startWord(slot, word) {
-        let pixels = this._sampleLetters(word);
+        let pixels = this._sampleLetters(word, this.sampleStep);
         if (pixels.length > this.MAX_STARS) {
             const step = pixels.length / this.MAX_STARS, picked = [];
             for (let i = 0; i < this.MAX_STARS; i++) picked.push(pixels[Math.floor(i * step)]);
@@ -172,16 +202,13 @@ class AmbientWords {
         });
         slot.delay = new Float32Array(slot.n);
         for (let i = 0; i < slot.n; i++) slot.delay[i] = Math.random() * 0.45;
-        // 词宽随屏幕走：最宽不超过可视宽度的约 1/3，保证整个词都在画面里
+        // 词宽随屏幕走：最宽不超过可视宽度的约 1/3，且不超过本槽位网格单元
+        // （窄屏位置向中心收拢，单元宽也要按同比例收窄，否则相邻词会叠在一起）
         const view = this._computeView();
-        slot.width = Math.min(190, 34 + word.length * 15, view.halfW * 2 * 0.34);
-        // 选位置：不与其它槽位重复，也尽量不连用上次的位置
-        const used = new Set(this.slots.map(s => s.spot).filter(x => x !== null));
-        let candidates = this.spots.map((sp, i) => i).filter(i => !used.has(i) && i !== slot.lastSpot);
-        if (!candidates.length) candidates = this.spots.map((sp, i) => i).filter(i => !used.has(i));
-        if (!candidates.length) candidates = this.spots.map((sp, i) => i);
-        const pick = candidates[Math.floor(Math.random() * candidates.length)];
-        slot.spot = pick; slot.lastSpot = pick;
+        const concX = this.camera.aspect < 1 ? 0.62 : 0.85;
+        const cellW = view.halfW * 2 / this.cols * concX;
+        slot.width = Math.min(190, 34 + word.length * 15, view.halfW * 2 * 0.34, cellW * 0.92);
+        // 位置是槽位固定的（建槽时按网格分好，互不重叠），这里不用再选
         // 时长：大范围随机 ÷ 本槽位节奏 → 每轮周期都不同，槽位之间更不同步
         // 停留占大头、过渡和间隔压短，保证成形词的在场率
         slot.durIn   = (2.5 + Math.random() * 2) / slot.tempo;
@@ -264,7 +291,7 @@ class AmbientWords {
             }
             else if (slot.state === 'out' && slot.t >= slot.durOut) {
                 this._restoreSlot(slot);
-                slot.state = 'idle'; slot.word = null; slot.spot = null;
+                slot.state = 'idle'; slot.word = null; // 位置固定不变，下轮还用同一个
                 slot.t = (0.3 + Math.random() * 2.2) / slot.tempo; // 下一轮间隔也随机+看节奏
                 continue;
             }

@@ -165,6 +165,7 @@ class QueryBuilder {
 
     select(cols = '*') { this._select = cols; return this; }
     eq(col, val)       { this._params.push(`${col}=eq.${encodeURIComponent(val)}`); return this; }
+    ilike(col, val)    { const esc = String(val).replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_'); this._params.push(`${col}=ilike.${encodeURIComponent(esc)}`); return this; } // 大小写不敏感匹配（% _ \ 先转义，免得被当成通配符）
     order(col, { ascending = true } = {}) {
         this._params.push(`order=${col}.${ascending ? 'asc' : 'desc'}`);
         return this;
