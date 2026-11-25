@@ -1,7 +1,6 @@
 if (typeof THREE === 'undefined') { throw new Error('Three.js not loaded'); }
 
 let scene, camera, renderer, composer, controls, galaxy;
-let mouseX = 0, mouseY = 0, targetX = 0, targetY = 0;
 
 function init() {
     scene = new THREE.Scene();
@@ -45,13 +44,8 @@ function init() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
     controls.minDistance = 150; controls.maxDistance = 2500;
-    controls.autoRotate = true; controls.autoRotateSpeed = 0.2;
+    controls.autoRotate = false; // 用户要求：不拖动就不动，相机不自动转
     controls.enablePan = false;
-
-    window.addEventListener('mousemove', (e) => {
-        mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-        mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-    });
 
     galaxy = new Galaxy(scene);
     galaxy.init();
@@ -71,10 +65,6 @@ function init() {
 function animate() {
     requestAnimationFrame(animate);
     
-    targetX = mouseX * 30; targetY = mouseY * 30;
-    scene.position.x += (targetX - scene.position.x) * 0.05;
-    scene.position.y += (targetY - scene.position.y) * 0.05;
-
     if(galaxy) galaxy.update();
     if(controls) controls.update();
     if(typeof window._wordTick === 'function') window._wordTick();

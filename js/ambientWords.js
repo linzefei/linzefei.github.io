@@ -18,8 +18,9 @@
  *
  * 成长感：同时在场的背景词数量随词库长大而变多——桌面 词数/3+5
  * （封顶 50 个）、手机 词数/5+3（封顶 12 个）。词越多星河越热闹，
- * 但到顶就不再加，避免画面太花。槽位多时背景词采样变稀（每词
- * 620→300→170 颗星），槽位按网格生成、每槽固定一个位置不重叠。
+ * 但到顶就不再加，避免画面太花。每词用满本槽位分到的星数（最多
+ * 620 颗），另有高亮层把笔画加粗，字才够清楚。槽位按网格生成、
+ * 每槽固定一个位置不重叠。
  *
  * 借星分区（盘面共 12000 颗）：主词只在 [0, 3000) 里借（见 index.html
  * 给 WordParticles 传的 borrowLimit），背景词用 [3000, 12000)，
@@ -57,22 +58,33 @@ class AmbientWords {
     }
 
     // 同时在场的词数随词库成长：桌面 词数/3+5（封顶 50），手机 词数/5+3（封顶 12）
-    // 星星是硬约束：背景区 9000 颗星，每词至少 170 颗才成字；槽位越多，
-    // 每词分到的星越少，所以采样随槽位数变稀（620→300→170）
+    // 星星是硬约束：背景区 9000 颗星；每词用满本槽位分到的星数
+    // （slotSize，上限 620），星够多时采样步长取 2，笔画更不断
     _buildSlots(wordCount) {
         const mobile = window.innerWidth < 700;
         const n = mobile
             ? Math.min(12, Math.max(3, Math.floor(wordCount / 5) + 3))
             : Math.min(50, Math.max(4, Math.floor(wordCount / 3) + 5));
         this.slotSize = Math.floor((12000 - this.ZONE_START) / n);
-        if (n <= 12) { this.sampleStep = 2; this.MAX_STARS = 620; }
-        else if (n <= 27) { this.sampleStep = 3; this.MAX_STARS = 300; }
-        else { this.sampleStep = 4; this.MAX_STARS = 170; }
+        this.MAX_STARS = Math.min(620, this.slotSize); // 用满本槽位分到的星数
+        this.sampleStep = this.MAX_STARS >= 300 ? 2 : 3; // 星够多时采样更细，笔画不断
         this.minFormed = Math.max(3, Math.round(n / 2));
         this.spots = this._genSpots(n);
         for (let s = 0; s < n; s++) {
             const anchor = new THREE.Object3D();
             this.galaxy.scene.add(anchor);
+            // 高亮层：与主词同款做法——与盘面共享位置/颜色属性，只重绘本槽
+            // 借出的那一段星星，用更大的发光点把笔画加粗，小字才够清楚
+            const hlGeo = new THREE.BufferGeometry();
+            hlGeo.setAttribute('position', this.geo.attributes.position);
+            hlGeo.setAttribute('color', this.geo.attributes.color);
+            hlGeo.setDrawRange(0, 0); // 没词时不画
+            const hlMatOpts = { size: 3.6, vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true };
+            if (this.galaxy.starTexture) hlMatOpts.map = this.galaxy.starTexture;
+            const hlMat = new THREE.PointsMaterial(hlMatOpts);
+            const hlPoints = new THREE.Points(hlGeo, hlMat);
+            hlPoints.frustumCulled = false;
+            this.galaxy.group.add(hlPoints);
             this.slots.push({
                 base: this.ZONE_START + s * this.slotSize,
                 anchor: anchor,
@@ -81,7 +93,8 @@ class AmbientWords {
                 t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
                 word: null, n: 0, unit: null, wordCol: null, delay: null,
                 width: 0, spot: s, // 位置是槽位固定的（建槽时按网格分好，互不重叠）
-                durIn: 4, durHold: 8, durOut: 4
+                durIn: 4, durHold: 8, durOut: 4,
+                hlGeo: hlGeo, hlMat: hlMat, hlPoints: hlPoints
             });
         }
     }
@@ -194,8 +207,8 @@ class AmbientWords {
         pixels.forEach((p, i) => {
             slot.unit[i * 2] = p.nx; slot.unit[i * 2 + 1] = p.ny;
             // 配色与主词同系但更暗：背景词是氛围，不抢主词的光
-            if (Math.random() < 0.8) { slot.wordCol[i * 3] = 1.05; slot.wordCol[i * 3 + 1] = 0.88; slot.wordCol[i * 3 + 2] = 0.10; } // Gold
-            else { slot.wordCol[i * 3] = 0.10; slot.wordCol[i * 3 + 1] = 1.05; slot.wordCol[i * 3 + 2] = 0.95; } // Neon Cyan
+            if (Math.random() < 0.8) { slot.wordCol[i * 3] = 1.35; slot.wordCol[i * 3 + 1] = 1.15; slot.wordCol[i * 3 + 2] = 0.12; } // Gold（v0.9.7 提亮）
+            else { slot.wordCol[i * 3] = 0.12; slot.wordCol[i * 3 + 1] = 1.35; slot.wordCol[i * 3 + 2] = 1.25; } // Neon Cyan
         });
         slot.delay = new Float32Array(slot.n);
         for (let i = 0; i < slot.n; i++) slot.delay[i] = Math.random() * 0.15;
@@ -204,7 +217,7 @@ class AmbientWords {
         const view = this._computeView();
         const concX = this.camera.aspect < 1 ? 0.62 : 0.85;
         const cellW = view.halfW * 2 / this.cols * concX;
-        slot.width = Math.min(190, 34 + word.length * 15, view.halfW * 2 * 0.34, cellW * 0.92);
+        slot.width = Math.min(220, 34 + word.length * 15, view.halfW * 2 * 0.34, cellW * 0.92);
         // 位置是槽位固定的（建槽时按网格分好，互不重叠），这里不用再选
         // 时长：大范围随机 ÷ 本槽位节奏 → 每轮周期都不同，槽位之间更不同步
         // 停留占大头、过渡和间隔压短，保证成形词的在场率
@@ -212,6 +225,8 @@ class AmbientWords {
         slot.durHold = (10 + Math.random() * 8) / slot.tempo;
         slot.durOut  = (2.5 + Math.random() * 2) / slot.tempo;
         slot.state = 'in'; slot.t = 0;
+        slot.hlGeo.setDrawRange(slot.base, slot.n); // 高亮层只重绘本词的星
+        slot.hlMat.opacity = 0; // 随成字过程淡入（见 update）
         return true;
     }
 
@@ -285,6 +300,7 @@ class AmbientWords {
             }
             else if (slot.state === 'out' && slot.t >= slot.durOut) {
                 this._restoreSlot(slot);
+                slot.hlGeo.setDrawRange(0, 0); // 高亮层藏起来
                 slot.state = 'idle'; slot.word = null; // 位置固定不变，下轮还用同一个
                 slot.t = (0.3 + Math.random() * 2.2) / slot.tempo; // 下一轮间隔也随机+看节奏
                 continue;
@@ -296,6 +312,8 @@ class AmbientWords {
             const W = slot.width, H = W * 0.28;
             const rawT = slot.state === 'in' ? Math.min(1, slot.t / slot.durIn)
                        : slot.state === 'out' ? Math.min(1, slot.t / slot.durOut) : 1;
+            // 高亮层随词淡入淡出（成字时 0→1，停留 1，落潮 1→0）
+            slot.hlMat.opacity = slot.state === 'in' ? rawT : slot.state === 'out' ? 1 - rawT : 1;
 
             for (let i = 0; i < slot.n; i++) {
                 let k;
