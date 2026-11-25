@@ -7,7 +7,9 @@
  *
  * 此起彼伏：每个槽位有自己的固定节奏系数（tempo），且每轮的
  * 涨潮/停留/落潮/间隔时长都大范围随机——各词周期互不相同、不断漂移，
- * 不会同一批一起出来、一起消失。
+ * 不会同一批一起出来、一起消失。另有保底协调：任一时刻至少留 3 个
+ * 已成形的词在场——想落潮的词要等别的词涨起来才放行，杜绝背景
+ * 出现「几乎空了」的低谷（v0.9.1 实测在 15 秒采样下会遇到低谷）。
  *
  * 位置按屏幕计算：槽位存的是归一化屏幕坐标（相对镜头视角中心），
  * 每帧按当前相机（视场角、宽高比、距离）换算成世界坐标。
@@ -50,7 +52,7 @@ class AmbientWords {
                 anchor: anchor,
                 tempo: 0.75 + Math.random() * 0.6, // 本槽位的固定节奏：0.75–1.35，各不相同
                 state: 'idle',
-                t: s * 2.4 + Math.random() * 2.5, // idle 时是倒计时：首批词逐个出现，不要一拥而上
+                t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
                 word: null, n: 0, unit: null, wordCol: null, delay: null,
                 width: 0, spot: null, lastSpot: -1,
                 durIn: 4, durHold: 8, durOut: 4,
@@ -166,9 +168,10 @@ class AmbientWords {
         const pick = candidates[Math.floor(Math.random() * candidates.length)];
         slot.spot = pick; slot.lastSpot = pick;
         // 时长：大范围随机 ÷ 本槽位节奏 → 每轮周期都不同，槽位之间更不同步
-        slot.durIn   = (3 + Math.random() * 3) / slot.tempo;
-        slot.durHold = (5 + Math.random() * 9) / slot.tempo;
-        slot.durOut  = (3 + Math.random() * 3) / slot.tempo;
+        // 停留占大头、过渡和间隔压短，保证成形词的在场率
+        slot.durIn   = (2.5 + Math.random() * 2) / slot.tempo;
+        slot.durHold = (7 + Math.random() * 7) / slot.tempo;
+        slot.durOut  = (2.5 + Math.random() * 2) / slot.tempo;
         slot.state = 'in'; slot.t = 0;
         return true;
     }
@@ -222,26 +225,32 @@ class AmbientWords {
         this._inv.getInverse(this.galaxy.group.matrixWorld);
         this._computeView();
         let anyActive = false;
+        // 保底协调：统计当前已成形（hold）的词数，贯穿本帧的进出决策
+        let holdCount = 0;
+        for (const s2 of this.slots) if (s2.state === 'hold') holdCount++;
 
         for (const slot of this.slots) {
             if (slot.state === 'idle') {
                 slot.t -= dt;
-                if (slot.t <= 0) {
+                if (slot.t <= 0 || holdCount <= 2) { // 在场词太少时不等倒计时，立刻补位
                     const w = this._nextWord();
                     if (!(w && this._startWord(slot, w))) {
-                        slot.t = (0.5 + Math.random() * 5) / slot.tempo;
+                        slot.t = (0.3 + Math.random() * 2.2) / slot.tempo;
                     }
                 }
                 continue;
             }
             anyActive = true;
             slot.t += dt;
-            if (slot.state === 'in' && slot.t >= slot.durIn) { slot.state = 'hold'; slot.t = 0; }
-            else if (slot.state === 'hold' && slot.t >= slot.durHold) { slot.state = 'out'; slot.t = 0; }
+            if (slot.state === 'in' && slot.t >= slot.durIn) { slot.state = 'hold'; slot.t = 0; holdCount++; }
+            else if (slot.state === 'hold' && slot.t >= slot.durHold) {
+                // 落潮要放行：在场成形词多于 3 个才许走，否则继续停留等别人涨起来
+                if (holdCount > 3) { slot.state = 'out'; slot.t = 0; holdCount--; }
+            }
             else if (slot.state === 'out' && slot.t >= slot.durOut) {
                 this._restoreSlot(slot);
                 slot.state = 'idle'; slot.word = null; slot.spot = null;
-                slot.t = (0.5 + Math.random() * 5) / slot.tempo; // 下一轮间隔也随机+看节奏
+                slot.t = (0.3 + Math.random() * 2.2) / slot.tempo; // 下一轮间隔也随机+看节奏
                 continue;
             }
 
