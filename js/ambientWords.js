@@ -2,9 +2,17 @@
  * AmbientWords – 漫天星河：背景里此起彼伏的词
  *
  * 主词之外，再让一批词同时在星河背景里沉浮：每个词借一小片盘面星星，
- * 在各自的位置上慢慢涨起（成字）、悬浮起伏、再落潮散回原位，
- * 各有各的节奏，轮流展露词库里的词。主词始终在中央唱主角，
- * 背景词更小、更暗，只作氛围，不抢戏、不可点亮。
+ * 慢慢涨起（成字）、悬浮起伏、再落潮散回原位，轮流展露词库里的词。
+ * 主词始终在中央唱主角，背景词更小、更暗，只作氛围，不抢戏、不可点亮。
+ *
+ * 此起彼伏：每个槽位有自己的固定节奏系数（tempo），且每轮的
+ * 涨潮/停留/落潮/间隔时长都大范围随机——各词周期互不相同、不断漂移，
+ * 不会同一批一起出来、一起消失。
+ *
+ * 位置按屏幕计算：槽位存的是归一化屏幕坐标（相对镜头视角中心），
+ * 每帧按当前相机（视场角、宽高比、距离）换算成世界坐标。
+ * 这样任何屏幕、任何缩放下词都保证在可见范围内：窄屏（手机）
+ * 自动向中心收拢，宽屏（PC）可以铺得更开。
  *
  * 借星分区（盘面共 12000 颗）：主词只在 [0, 5400) 里借（见 index.html
  * 给 WordParticles 传的 borrowLimit），背景词用 [5400, 12000)，
@@ -21,14 +29,16 @@ class AmbientWords {
         this.ZONE_START = 5400;
         this.SLOT_SIZE = 1100;
         this.MAX_STARS = 620;
-        // 背景词的候选位置（场景坐标）：散布在盘面四周与上下，避开中央主词
+        // 槽位位置：归一化屏幕坐标（nx, ny ∈ [-1, 1]，相对可视半宽/半高），
+        // depth 为沿视线方向的深度偏移（占到中心距离的比例，负 = 更远更小）。
+        // 刻意避开正中央（|nx|<0.34 且 |ny|<0.30 是主词的地盘）。
         this.spots = [
-            { x: -350, y: 255, z: -140 }, { x: -170, y: 285, z: -190 },
-            { x: 30,   y: 295, z: -210 }, { x: 210,  y: 275, z: -170 },
-            { x: 370,  y: 240, z: -130 }, { x: -430, y: 130, z: -90 },
-            { x: 435,  y: 120, z: -80 },  { x: -330, y: -35, z: 60 },
-            { x: 340,  y: -50, z: 50 },   { x: -120, y: -70, z: 90 },
-            { x: 140,  y: -80, z: 80 }
+            { nx: -0.78, ny:  0.62, depth: -0.08 }, { nx: -0.38, ny:  0.78, depth: -0.12 },
+            { nx:  0.05, ny:  0.84, depth: -0.14 }, { nx:  0.48, ny:  0.74, depth: -0.10 },
+            { nx:  0.80, ny:  0.55, depth: -0.06 }, { nx: -0.85, ny:  0.08, depth: -0.05 },
+            { nx:  0.86, ny:  0.02, depth: -0.05 }, { nx: -0.72, ny: -0.55, depth: -0.03 },
+            { nx:  0.74, ny: -0.60, depth: -0.03 }, { nx: -0.30, ny: -0.78, depth: -0.06 },
+            { nx:  0.32, ny: -0.80, depth: -0.06 }
         ];
         const count = window.innerWidth < 700 ? 4 : 6;
         this.slots = [];
@@ -38,8 +48,9 @@ class AmbientWords {
             this.slots.push({
                 base: this.ZONE_START + s * this.SLOT_SIZE,
                 anchor: anchor,
+                tempo: 0.75 + Math.random() * 0.6, // 本槽位的固定节奏：0.75–1.35，各不相同
                 state: 'idle',
-                t: 1 + s * 1.7 + Math.random() * 2, // idle 时是倒计时，错开启动
+                t: s * 2.4 + Math.random() * 2.5, // idle 时是倒计时：首批词逐个出现，不要一拥而上
                 word: null, n: 0, unit: null, wordCol: null, delay: null,
                 width: 0, spot: null, lastSpot: -1,
                 durIn: 4, durHold: 8, durOut: 4,
@@ -49,6 +60,11 @@ class AmbientWords {
         }
         this._m = new THREE.Matrix4();
         this._inv = new THREE.Matrix4();
+        this._origin = new THREE.Vector3(0, 90, 0); // 视角中心（主词附近的高度）
+        this._right = new THREE.Vector3();
+        this._up = new THREE.Vector3();
+        this._fwd = new THREE.Vector3();
+        this._view = { halfW: 0, halfH: 0, dist: 0 };
         this._lastNow = null;
         this.time = 0;
         window._ambient = this; // 调试/验证用
@@ -105,6 +121,20 @@ class AmbientWords {
         return pixels;
     }
 
+    // 按当前相机算可视范围：halfW/halfH 是中心平面处的可视半宽/半高（世界单位）
+    _computeView() {
+        const cam = this.camera;
+        cam.updateMatrixWorld();
+        const dist = cam.position.distanceTo(this._origin);
+        const halfH = dist * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+        const halfW = halfH * cam.aspect;
+        this._right.setFromMatrixColumn(cam.matrixWorld, 0);
+        this._up.setFromMatrixColumn(cam.matrixWorld, 1);
+        this._fwd.copy(this._origin).sub(cam.position).normalize();
+        this._view = { halfW, halfH, dist };
+        return this._view;
+    }
+
     _startWord(slot, word) {
         let pixels = this._sampleLetters(word);
         if (pixels.length > this.MAX_STARS) {
@@ -125,7 +155,9 @@ class AmbientWords {
         });
         slot.delay = new Float32Array(slot.n);
         for (let i = 0; i < slot.n; i++) slot.delay[i] = Math.random() * 0.45;
-        slot.width = Math.min(190, 34 + word.length * 15);
+        // 词宽随屏幕走：最宽不超过可视宽度的约 1/3，保证整个词都在画面里
+        const view = this._computeView();
+        slot.width = Math.min(190, 34 + word.length * 15, view.halfW * 2 * 0.34);
         // 选位置：不与其它槽位重复，也尽量不连用上次的位置
         const used = new Set(this.slots.map(s => s.spot).filter(x => x !== null));
         let candidates = this.spots.map((sp, i) => i).filter(i => !used.has(i) && i !== slot.lastSpot);
@@ -133,9 +165,10 @@ class AmbientWords {
         if (!candidates.length) candidates = this.spots.map((sp, i) => i);
         const pick = candidates[Math.floor(Math.random() * candidates.length)];
         slot.spot = pick; slot.lastSpot = pick;
-        slot.durIn = 3.2 + Math.random() * 1.6;
-        slot.durHold = 6 + Math.random() * 5;
-        slot.durOut = 3.2 + Math.random() * 1.6;
+        // 时长：大范围随机 ÷ 本槽位节奏 → 每轮周期都不同，槽位之间更不同步
+        slot.durIn   = (3 + Math.random() * 3) / slot.tempo;
+        slot.durHold = (5 + Math.random() * 9) / slot.tempo;
+        slot.durOut  = (3 + Math.random() * 3) / slot.tempo;
         slot.state = 'in'; slot.t = 0;
         return true;
     }
@@ -153,6 +186,27 @@ class AmbientWords {
         this.geo.attributes.color.needsUpdate = true;
     }
 
+    // 把槽位锚点放到它归一化坐标对应的世界位置（每帧按当前屏幕重算）
+    _placeAnchor(slot) {
+        const spot = this.spots[slot.spot];
+        const view = this._view;
+        // 窄屏向中心收拢（手机上边角看不清），宽屏铺开
+        const concX = this.camera.aspect < 1 ? 0.62 : 0.85;
+        const concY = this.camera.aspect < 1 ? 0.68 : 0.85;
+        // 沉浮：归一化空间里的小幅正弦漂移
+        const bobX = Math.cos(this.time * slot.bobSpeed * 0.7 + slot.bobPhase) * 0.02;
+        const bobY = Math.sin(this.time * slot.bobSpeed + slot.bobPhase) * 0.035;
+        const nx = spot.nx * concX + bobX;
+        const ny = spot.ny * concY + bobY;
+        const p = slot.anchor.position;
+        p.copy(this._origin)
+            .addScaledVector(this._right, nx * view.halfW)
+            .addScaledVector(this._up, ny * view.halfH)
+            .addScaledVector(this._fwd, spot.depth * view.dist);
+        if (this.camera) slot.anchor.quaternion.copy(this.camera.quaternion);
+        slot.anchor.updateMatrixWorld();
+    }
+
     update() {
         const now = performance.now();
         let dt = this._lastNow == null ? 0 : (now - this._lastNow) / 1000;
@@ -166,6 +220,7 @@ class AmbientWords {
         const home = this.galaxy.diskHomePos, homeCol = this.galaxy.diskHomeCol;
         this.galaxy.group.updateMatrixWorld();
         this._inv.getInverse(this.galaxy.group.matrixWorld);
+        this._computeView();
         let anyActive = false;
 
         for (const slot of this.slots) {
@@ -173,7 +228,9 @@ class AmbientWords {
                 slot.t -= dt;
                 if (slot.t <= 0) {
                     const w = this._nextWord();
-                    if (!(w && this._startWord(slot, w))) slot.t = 2 + Math.random() * 2;
+                    if (!(w && this._startWord(slot, w))) {
+                        slot.t = (0.5 + Math.random() * 5) / slot.tempo;
+                    }
                 }
                 continue;
             }
@@ -184,17 +241,11 @@ class AmbientWords {
             else if (slot.state === 'out' && slot.t >= slot.durOut) {
                 this._restoreSlot(slot);
                 slot.state = 'idle'; slot.word = null; slot.spot = null;
-                slot.t = 1.5 + Math.random() * 3.5;
+                slot.t = (0.5 + Math.random() * 5) / slot.tempo; // 下一轮间隔也随机+看节奏
                 continue;
             }
 
-            // 锚点：固定位置 + 正弦沉浮，每帧朝向相机（与主词同一套变换）
-            const spot = this.spots[slot.spot];
-            const bobY = Math.sin(this.time * slot.bobSpeed + slot.bobPhase) * 9;
-            const bobX = Math.cos(this.time * slot.bobSpeed * 0.7 + slot.bobPhase) * 5;
-            slot.anchor.position.set(spot.x + bobX, spot.y + bobY, spot.z);
-            if (this.camera) slot.anchor.quaternion.copy(this.camera.quaternion);
-            slot.anchor.updateMatrixWorld();
+            this._placeAnchor(slot);
             this._m.multiplyMatrices(this._inv, slot.anchor.matrixWorld);
             const e = this._m.elements;
             const W = slot.width, H = W * 0.28;
