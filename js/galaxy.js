@@ -31,11 +31,11 @@ class Galaxy {
         return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
     }
 
-    _makePoints(pos, col, tex, size, opacity) {
+    _makePoints(pos, col, tex, size, opacity, sizeAttenuation) {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        return new THREE.Points(geo, new THREE.PointsMaterial({ size, map: tex, vertexColors: true, transparent: true, opacity: opacity||1, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
+        return new THREE.Points(geo, new THREE.PointsMaterial({ size, map: tex, vertexColors: true, transparent: true, opacity: opacity||1, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: sizeAttenuation !== false }));
     }
 
     _createBackground(tex) {
@@ -50,14 +50,17 @@ class Galaxy {
 
     // 满天星空：旧的 background 层在 2500–5000 外（已到远裁剪面边缘），
     // 又小又暗，边缘看起来还是黑的。这一层放在 1500–3000 的球壳上——
-    // 比盘面（半径 500）远、比远裁剪面（5000）近得多，大小和亮度都够
-    // 在画面边缘看清；分两档：大量小星 + 少量亮星，逐颗闪烁。
-    // 加到 scene（不跟盘面一起转），是远处的“天”，背景词浮在它前面才合理。
+    // 比盘面（半径 500）远、比远裁剪面（5000）近得多；分两档：大量小星 +
+    // 少量亮星，逐颗闪烁。加到 scene（不跟盘面一起转），是远处的“天”，
+    // 背景词浮在它前面才合理。
+    // v0.9.6 教训：星空必须关掉 sizeAttenuation——开着时透视会把 1500–3000
+    // 外的星缩到 0.2–0.4 像素，等于看不见（v0.9.5 就是这么“隐身”的）。
+    // 关掉后 size 是固定像素尺寸，星星不随距离缩小，才是星空该有的样子。
     _createSky(tex) {
         this.skyLayers = [];
         const layers = [
-            { n: GALAXY_CONFIG.particles.sky,       size: 1.5, bright: [0.30, 0.70], speed: 0.9 },
-            { n: GALAXY_CONFIG.particles.skyBright, size: 2.6, bright: [0.60, 1.00], speed: 0.6 },
+            { n: GALAXY_CONFIG.particles.sky,       size: 2.2, bright: [0.30, 0.70], speed: 0.9 },
+            { n: GALAXY_CONFIG.particles.skyBright, size: 4.0, bright: [0.60, 1.00], speed: 0.6 },
         ];
         for (const L of layers) {
             const pos = new Float32Array(L.n * 3), col = new Float32Array(L.n * 3);
@@ -72,7 +75,7 @@ class Galaxy {
                 else { col[i * 3] = b; col[i * 3 + 1] = b; col[i * 3 + 2] = b * 1.15; } // 偏冷白
                 phase[i] = Math.random() * Math.PI * 2;
             }
-            const points = this._makePoints(pos, col, tex, L.size, 0.9);
+            const points = this._makePoints(pos, col, tex, L.size, 0.9, false);
             points.frustumCulled = false; // 球壳横跨整个视野，别被裁掉
             this.scene.add(points);
             this.skyLayers.push({ points, base: col.slice(), phase, speed: L.speed, n: L.n });
