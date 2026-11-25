@@ -50,7 +50,7 @@ class AmbientWords {
                 anchor: anchor,
                 tempo: 0.75 + Math.random() * 0.6, // 本槽位的固定节奏：0.75–1.35，各不相同
                 state: 'idle',
-                t: s * 2.4 + Math.random() * 2.5, // idle 时是倒计时：首批词逐个出现，不要一拥而上
+                t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
                 word: null, n: 0, unit: null, wordCol: null, delay: null,
                 width: 0, spot: null, lastSpot: -1,
                 durIn: 4, durHold: 8, durOut: 4,
