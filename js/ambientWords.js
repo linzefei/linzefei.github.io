@@ -16,9 +16,13 @@
  * 这样任何屏幕、任何缩放下词都保证在可见范围内：窄屏（手机）
  * 自动向中心收拢，宽屏（PC）可以铺得更开。
  *
- * 借星分区（盘面共 12000 颗）：主词只在 [0, 5400) 里借（见 index.html
- * 给 WordParticles 传的 borrowLimit），背景词用 [5400, 12000)，
- * 切成 6 个槽位轮换，两边永不抢同一颗星。
+ * 成长感：同时在场的背景词数量随词库长大而变多——桌面 词数/6+2
+ * （4–9 个封顶）、手机 词数/8+2（3–5 个封顶）。词越多星河越热闹，
+ * 但到顶就不再加，避免画面太花。
+ *
+ * 借星分区（盘面共 12000 颗）：主词只在 [0, 4200) 里借（见 index.html
+ * 给 WordParticles 传的 borrowLimit），背景词用 [4200, 12000)，
+ * 按槽位数均分，两边永不抢同一颗星。
  */
 class AmbientWords {
     constructor(galaxy, camera) {
@@ -28,9 +32,10 @@ class AmbientWords {
         this.pool = [];
         this.mainWord = null;
         this.deck = [];
-        this.ZONE_START = 5400;
-        this.SLOT_SIZE = 1100;
+        this.ZONE_START = 4200;
         this.MAX_STARS = 620;
+        this.slotSize = 0;
+        this.minFormed = 3; // 保底在场数，随槽位数缩放（见 _buildSlots）
         // 槽位位置：归一化屏幕坐标（nx, ny ∈ [-1, 1]，相对可视半宽/半高），
         // depth 为沿视线方向的深度偏移（占到中心距离的比例，负 = 更远更小）。
         // 刻意避开正中央（|nx|<0.34 且 |ny|<0.30 是主词的地盘）。
@@ -42,24 +47,7 @@ class AmbientWords {
             { nx:  0.74, ny: -0.60, depth: -0.03 }, { nx: -0.30, ny: -0.78, depth: -0.06 },
             { nx:  0.32, ny: -0.80, depth: -0.06 }
         ];
-        const count = window.innerWidth < 700 ? 4 : 6;
-        this.slots = [];
-        for (let s = 0; s < count; s++) {
-            const anchor = new THREE.Object3D();
-            galaxy.scene.add(anchor);
-            this.slots.push({
-                base: this.ZONE_START + s * this.SLOT_SIZE,
-                anchor: anchor,
-                tempo: 0.75 + Math.random() * 0.6, // 本槽位的固定节奏：0.75–1.35，各不相同
-                state: 'idle',
-                t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
-                word: null, n: 0, unit: null, wordCol: null, delay: null,
-                width: 0, spot: null, lastSpot: -1,
-                durIn: 4, durHold: 8, durOut: 4,
-                bobPhase: Math.random() * Math.PI * 2,
-                bobSpeed: 0.35 + Math.random() * 0.4
-            });
-        }
+        this.slots = []; // 槽位在 setPool 拿到词库规模后按成长规则生成
         this._m = new THREE.Matrix4();
         this._inv = new THREE.Matrix4();
         this._origin = new THREE.Vector3(0, 90, 0); // 视角中心（主词附近的高度）
@@ -72,9 +60,36 @@ class AmbientWords {
         window._ambient = this; // 调试/验证用
     }
 
+    // 同时在场的词数随词库成长：桌面 词数/6+2（4–9），手机 词数/8+2（3–5）
+    _buildSlots(wordCount) {
+        const mobile = window.innerWidth < 700;
+        const n = mobile
+            ? Math.min(5, Math.max(3, Math.floor(wordCount / 8) + 2))
+            : Math.min(9, Math.max(4, Math.floor(wordCount / 6) + 2));
+        this.slotSize = Math.floor((12000 - this.ZONE_START) / n);
+        this.minFormed = Math.max(3, Math.round(n / 2));
+        for (let s = 0; s < n; s++) {
+            const anchor = new THREE.Object3D();
+            this.galaxy.scene.add(anchor);
+            this.slots.push({
+                base: this.ZONE_START + s * this.slotSize,
+                anchor: anchor,
+                tempo: 0.75 + Math.random() * 0.6, // 本槽位的固定节奏：0.75–1.35，各不相同
+                state: 'idle',
+                t: 0.3 + s * 0.55 + Math.random() * 1.1, // idle 时是倒计时：首批词尽早出来（约 0–4 秒内各槽位都启动），之后靠各自节奏错开
+                word: null, n: 0, unit: null, wordCol: null, delay: null,
+                width: 0, spot: null, lastSpot: -1,
+                durIn: 4, durHold: 8, durOut: 4,
+                bobPhase: Math.random() * Math.PI * 2,
+                bobSpeed: 0.35 + Math.random() * 0.4
+            });
+        }
+    }
+
     setPool(entries, mainWord) {
         this.pool = entries.map(e => e.word);
         this.mainWord = mainWord || null;
+        if (!this.slots.length) this._buildSlots(entries.length);
         this._rebuildDeck();
     }
 
@@ -214,7 +229,7 @@ class AmbientWords {
         const now = performance.now();
         let dt = this._lastNow == null ? 0 : (now - this._lastNow) / 1000;
         this._lastNow = now;
-        if (dt > 0.5) dt = 0.5;
+        if (dt > 1.0) dt = 1.0; // 封顶 1s：防切后台回来跳变，又不让低帧率设备全程慢动作
         if (dt <= 0) return;
         this.time += dt;
 
@@ -232,7 +247,7 @@ class AmbientWords {
         for (const slot of this.slots) {
             if (slot.state === 'idle') {
                 slot.t -= dt;
-                if (slot.t <= 0 || holdCount <= 2) { // 在场词太少时不等倒计时，立刻补位
+                if (slot.t <= 0 || holdCount < this.minFormed) { // 在场词太少时不等倒计时，立刻补位
                     const w = this._nextWord();
                     if (!(w && this._startWord(slot, w))) {
                         slot.t = (0.3 + Math.random() * 2.2) / slot.tempo;
@@ -244,8 +259,8 @@ class AmbientWords {
             slot.t += dt;
             if (slot.state === 'in' && slot.t >= slot.durIn) { slot.state = 'hold'; slot.t = 0; holdCount++; }
             else if (slot.state === 'hold' && slot.t >= slot.durHold) {
-                // 落潮要放行：在场成形词多于 3 个才许走，否则继续停留等别人涨起来
-                if (holdCount > 3) { slot.state = 'out'; slot.t = 0; holdCount--; }
+                // 落潮要放行：在场成形词多于保底数才许走，否则继续停留等别人涨起来
+                if (holdCount > this.minFormed) { slot.state = 'out'; slot.t = 0; holdCount--; }
             }
             else if (slot.state === 'out' && slot.t >= slot.durOut) {
                 this._restoreSlot(slot);
