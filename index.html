@@ -122,11 +122,12 @@
     <script src="js/config.js"></script>
     <script src="js/galaxy.js"></script>
     <script src="js/wordParticles.js"></script>
+    <script src="js/ambientWords.js"></script>
     <script src="js/main.js"></script>
 
     <script>
     /* ─── 版本号 ─────────────────────────────────────────────────────────── */
-    const SITE_VERSION = 'v0.8.1';
+    const SITE_VERSION = 'v0.9.0';
     const _verEl = document.getElementById('site-version');
     if (_verEl) _verEl.textContent = SITE_VERSION;
 
@@ -217,6 +218,7 @@
     let queueIndex  = 0;
     let wordScene   = null;
     let wordCamera  = null;
+    let ambient     = null; // 背景沉浮的词（AmbientWords）
     const QUEUE_IDX_KEY = '_wq_idx';
 
     // 内置默认词（兜底：数据库未配置时使用）
@@ -274,6 +276,7 @@
     let activeEntry = null; // 当前正在展示的词条目
 
     function tickWordQueue() {
+        if (ambient) ambient.update();
         if (!wordScene || !wordCamera || wordQueue.length === 0) return;
 
         // 推进当前词
@@ -291,7 +294,9 @@
         const entry = wordQueue[queueIndex];
         if (entry) {
             activeEntry = entry;
-            activeWord = new WordParticles(entry.word, galaxy, wordCamera, igniteTier(entry.ignite_count));
+            // 主词只借盘面前 5400 颗星，后半盘面留给背景沉浮的词，两边不抢星
+            activeWord = new WordParticles(entry.word, galaxy, wordCamera, igniteTier(entry.ignite_count), 5400);
+            if (ambient) ambient.setMainWord(entry.word);
             updateIgniteBadge();
         }
     }
@@ -387,6 +392,8 @@
             wordCamera = camera;
             fetchWords().then(() => {
                 setupEncounter();
+                ambient = new AmbientWords(galaxy, wordCamera);
+                ambient.setPool(wordQueue, null);
                 // 延迟 1s 再开始，让银河先渲染出来
                 setTimeout(() => {
                     tickWordQueue();
